@@ -1,32 +1,37 @@
 // lib/features/symptoms/symptom_result_screen.dart
 import 'package:flutter/material.dart';
 import 'symptom_questions.dart';
- 
+
 enum RiskLevel { high, medium, low }
- 
+
 class SymptomResultScreen extends StatelessWidget {
   final RiskLevel level;
   final VoidCallback onRestart;
- 
+
+  /// Called when "Find medical care" is pressed. Connect this to your
+  /// clinic / hospital finder. If null, a placeholder message is shown.
+  final VoidCallback? onFindCare;
+
   const SymptomResultScreen({
     super.key,
     required this.level,
     required this.onRestart,
+    this.onFindCare,
   });
- 
+
   // Illustrative wording - not clinically approved.
-  String get _title => switch (level) {
-        RiskLevel.high => 'High Risk',
-        RiskLevel.medium => 'Medium Risk',
-        RiskLevel.low => 'Low Risk',
+  String get _pillLabel => switch (level) {
+        RiskLevel.high => 'High risk',
+        RiskLevel.medium => 'Medium risk',
+        RiskLevel.low => 'Low risk',
       };
- 
-  String get _advice => switch (level) {
-        RiskLevel.high => 'Go to a hospital now.',
-        RiskLevel.medium => 'See a doctor and get a blood test.',
-        RiskLevel.low => 'Rest, drink fluids, monitor.',
+
+  String get _headline => switch (level) {
+        RiskLevel.high => 'Seek urgent medical care',
+        RiskLevel.medium => 'Get medical advice',
+        RiskLevel.low => 'Rest and monitor',
       };
- 
+
   String get _message => switch (level) {
         RiskLevel.high =>
           'A warning sign was reported. Please seek urgent medical assessment.',
@@ -40,146 +45,306 @@ class SymptomResultScreen extends StatelessWidget {
               'symptoms and seek medical advice if you are concerned or '
               'your condition worsens.',
       };
- 
-  Color get _riskColor => switch (level) {
+
+  String get _nextSteps => switch (level) {
+        RiskLevel.high =>
+          'Go to a hospital now. Tell the staff when your symptoms started '
+              'and which warning signs you have.',
+        RiskLevel.medium =>
+          'See a doctor and get a blood test. Tell your doctor when your '
+              'symptoms started and if they are getting worse.',
+        RiskLevel.low =>
+          'Rest, drink fluids and monitor your symptoms. Tell your doctor '
+              'when they started and if they are getting worse.',
+      };
+
+  Color get _pillBackground => switch (level) {
+        RiskLevel.high => AppColors.riskHighTint,
+        RiskLevel.medium => AppColors.riskMediumTint,
+        RiskLevel.low => AppColors.riskLowTint,
+      };
+
+  Color get _pillText => switch (level) {
+        RiskLevel.high => AppColors.riskHighText,
+        RiskLevel.medium => AppColors.riskMediumText,
+        RiskLevel.low => AppColors.riskLowText,
+      };
+
+  Color get _pillDot => switch (level) {
         RiskLevel.high => AppColors.riskHigh,
         RiskLevel.medium => AppColors.riskMedium,
         RiskLevel.low => AppColors.riskLow,
       };
- 
-  IconData get _icon => switch (level) {
-        RiskLevel.high => Icons.error,
-        RiskLevel.medium => Icons.warning_amber_rounded,
-        RiskLevel.low => Icons.check_circle,
-      };
- 
+
+  // Built from the same list the questionnaire uses, so they never drift apart.
+  String get _urgentText {
+    if (warningSigns.isEmpty) {
+      return 'Seek urgent care if you feel seriously unwell. Do not wait.';
+    }
+    final signs = warningSigns.map((s) => s.toLowerCase()).toList();
+    final last = signs.removeLast();
+    final list = signs.isEmpty ? last : '${signs.join(', ')} or $last';
+    return 'Seek urgent care for $list. Do not wait.';
+  }
+
+  void _findCare(BuildContext context) {
+    if (onFindCare != null) {
+      onFindCare!();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Find medical care is not connected yet.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.softBackground,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Result',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.heading,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Result / alert card (sage green) with risk colour accent.
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppColors.alertCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border(
-                    left: BorderSide(color: _riskColor, width: 8),
-                  ),
-                ),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(_icon, color: _riskColor, size: 34),
-                        const SizedBox(width: 10),
-                        Text(
-                          _title,
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.heading,
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).maybePop(),
+                            child: const Icon(Icons.arrow_back,
+                                size: 22, color: AppColors.button),
+                          ),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Symptom Checker',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.heading,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     const Text(
-                      'Advice',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.heading,
-                      ),
+                      'Your result · Demo questionnaire',
+                      style: TextStyle(fontSize: 13, color: AppColors.body),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _advice,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.heading,
+                    const SizedBox(height: 16),
+
+                    // Result card with risk pill.
+                    _whiteCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _pillBackground,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: _pillDot,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _pillLabel,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _pillText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            _headline,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.heading,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _message,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.45,
+                              color: AppColors.body,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      _message,
-                      style: const TextStyle(
-                        fontSize: 16,
+
+                    // What to do next.
+                    _whiteCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'What to do next',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.heading,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _nextSteps,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.45,
+                              color: AppColors.body,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // When to get urgent help (sage card).
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.alertCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.bannerBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.monitor_heart_outlined,
+                                  size: 18, color: AppColors.button),
+                              SizedBox(width: 8),
+                              Text(
+                                'When to get urgent help',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.heading,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _urgentText,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.45,
+                              color: AppColors.heading,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Required medical disclaimer - exact wording.
+                    const Text(
+                      'This is not a medical diagnosis. Always consult a doctor.',
+                      style: TextStyle(
+                        fontSize: 12,
                         height: 1.4,
-                        color: AppColors.heading,
+                        color: AppColors.body,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
- 
-              // Required medical disclaimer - exact wording.
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.alertCard,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: AppColors.heading),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'This is not a medical diagnosis. Always consult a doctor.',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.heading,
+            ),
+
+            // Bottom buttons.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _findCare(context),
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        backgroundColor: AppColors.button,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
+                      child: const Text(
+                        'Find medical care',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
- 
-              ElevatedButton(
-                onPressed: () {
-                  onRestart();
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.button,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                child: const Text(
-                  'Start Again',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        onRestart();
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColors.heading,
+                        side: const BorderSide(color: AppColors.border),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Back to Home',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _whiteCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: child,
     );
   }
 }
