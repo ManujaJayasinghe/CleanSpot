@@ -48,3 +48,7 @@ app.*.map.json
 .widget_preview/
 
 .env
+
+# AI live-test sample photos stay local; only the folder placeholder is tracked
+assets/dev_samples/*
+!assets/dev_samples/.gitkeep

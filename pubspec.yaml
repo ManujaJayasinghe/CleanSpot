@@ -41,6 +41,8 @@ dependencies:
   go_router: ^18.0.2
   provider: ^6.1.5+1
   google_sign_in: ^7.2.0
+  firebase_ai: ^4.0.0
+  firebase_app_check: ^0.4.8
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +65,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Sample photos for the debug-only AI live test (see
+  # lib/features/ai_validation/README.md). Photos are git-ignored.
+  assets:
+    - assets/dev_samples/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
