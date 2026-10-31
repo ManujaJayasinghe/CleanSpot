@@ -300,35 +300,31 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => _select(value),
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         height: 44,
         decoration: BoxDecoration(
-          color: selected ? AppColors.alertCard : Colors.white,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: selected ? AppColors.selectedBorder : AppColors.border,
+            color: selected ? Colors.black : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: selected ? AppColors.heading : AppColors.button,
-              ),
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.button,
             ),
-            if (selected)
-              const Positioned(
-                right: 12,
-                child: Icon(Icons.check_circle_outline,
-                    size: 18, color: AppColors.button),
-              ),
-          ],
+          ),  
+          
         ),
       ),
     );
