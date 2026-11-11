@@ -12,7 +12,7 @@ class SymptomsScreen extends StatefulWidget {
 
 class _SymptomsScreenState extends State<SymptomsScreen> {
   int _index = 0;
-  bool _showWarnings = false; // warning-sign list, shown after Q4
+  bool _showWarnings = false; // warning-sign list, shown after all 7 questions
   final Set<int> _ticked = {};
   // One entry per question; null = not answered yet.
   final List<bool?> _answers = List.filled(symptomQuestions.length, null);
@@ -257,7 +257,7 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
     );
   }
 
-  // ---------- Questions 1-4 ----------
+  // ---------- Questions 1-7 ----------
 
   Widget _questionBody() {
     final total = symptomQuestions.length;
@@ -330,7 +330,7 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
     );
   }
 
-  // ---------- Warning signs (after Q4) ----------
+  // ---------- Warning signs (after Q7) ----------
 
   Widget _warningBody() {
     return Column(

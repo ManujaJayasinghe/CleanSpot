@@ -56,6 +56,15 @@ const List<SymptomQuestion> symptomQuestions = [
   SymptomQuestion(
     question: "Are you experiencing nausea or vomiting?",
   ),
+  SymptomQuestion(
+    question: "Have you noticed a skin rash on your body?",
+  ),
+  SymptomQuestion(
+    question: "Have you experienced unusual tiredness or weakness?",
+  ),
+  SymptomQuestion(
+    question: "Have you experienced a loss of appetite?",
+  ),
 ];
 
 // Shown AFTER the 4 questions as a tick-list (not a question).
