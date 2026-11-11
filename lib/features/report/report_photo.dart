@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../app/theme_proposal.dart';
 
-/// Site photo for the report flow. Falls back to a plain green block when no
-/// photo was picked.
+/// Site photo for the report flow.
+/// Supports both network URLs (http/https) and Base64 data strings (data:image or raw base64).
+/// Falls back to a plain green block when no photo was provided or error occurs.
 class ReportPhoto extends StatelessWidget {
   const ReportPhoto({
     super.key,
@@ -19,6 +21,28 @@ class ReportPhoto extends StatelessWidget {
 
   /// Draws the corner brackets and scan line used on the AI checking screen.
   final bool showScanFrame;
+
+  Widget _buildImageWidget(String source, Widget fallback) {
+    if (source.startsWith('data:image') || !source.startsWith('http')) {
+      try {
+        final cleanBase64 = source.contains(',') ? source.split(',').last : source;
+        final bytes = base64Decode(cleanBase64.trim());
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    return Image.network(
+      source,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,14 +61,10 @@ class ReportPhoto extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (url == null)
+            if (url == null || url!.isEmpty)
               fallback
             else
-              Image.network(
-                url!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => fallback,
-              ),
+              _buildImageWidget(url!, fallback),
             if (showScanFrame)
               const CustomPaint(painter: _ScanFramePainter()),
           ],
@@ -76,27 +96,32 @@ class _ScanFramePainter extends CustomPainter {
       Path()
         ..moveTo(l, t + len)
         ..lineTo(l, t)
-        ..lineTo(l + len, t)
+        ..lineTo(l + len, t),
+      paint,
+    );
+    canvas.drawPath(
+      Path()
         ..moveTo(r - len, t)
         ..lineTo(r, t)
-        ..lineTo(r, t + len)
+        ..lineTo(r, t + len),
+      paint,
+    );
+    canvas.drawPath(
+      Path()
         ..moveTo(l, b - len)
         ..lineTo(l, b)
-        ..lineTo(l + len, b)
+        ..lineTo(l + len, b),
+      paint,
+    );
+    canvas.drawPath(
+      Path()
         ..moveTo(r - len, b)
         ..lineTo(r, b)
         ..lineTo(r, b - len),
       paint,
     );
-
-    // Scan line.
-    canvas.drawLine(
-      Offset(l, size.height * 0.5),
-      Offset(r, size.height * 0.5),
-      paint..strokeWidth = 1.5,
-    );
   }
 
   @override
-  bool shouldRepaint(_ScanFramePainter old) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

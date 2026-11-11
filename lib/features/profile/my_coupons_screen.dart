@@ -1,19 +1,15 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme_proposal.dart';
-import 'dummy_data.dart';
-import 'widgets/widgets.dart';
+import '../../models/redemption_model.dart';
+import '../../services/firestore_service.dart';
 
-/// Screen displaying coupons redeemed by the user matching the mockup screenshot.
+/// Screen displaying coupons redeemed by the user from Firestore.
 class MyCouponsScreen extends StatelessWidget {
-  final List<DummyRedemption> redemptions;
-
-  const MyCouponsScreen({
-    super.key,
-    this.redemptions = dummyRedemptions,
-  });
+  const MyCouponsScreen({super.key});
 
   void _copyCode(BuildContext context, String code) {
     Clipboard.setData(ClipboardData(text: code));
@@ -28,8 +24,33 @@ class MyCouponsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCouponCard(BuildContext context, DummyRedemption item) {
+  IconData _iconForTitle(String title) {
+    final lower = title.toLowerCase();
+    if (lower.contains('coffee') || lower.contains('cafe')) {
+      return Icons.local_cafe_outlined;
+    } else if (lower.contains('plant') || lower.contains('seed')) {
+      return Icons.yard_outlined;
+    } else if (lower.contains('soap') || lower.contains('spray') || lower.contains('kit')) {
+      return Icons.clean_hands_outlined;
+    } else if (lower.contains('bus') || lower.contains('transit')) {
+      return Icons.directions_bus_outlined;
+    } else if (lower.contains('tea')) {
+      return Icons.emoji_food_beverage_outlined;
+    }
+    return Icons.local_offer_outlined;
+  }
+
+  String _formatDate(DateTime dt) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+  Widget _buildCouponCard(BuildContext context, RedemptionModel item) {
     final textTheme = Theme.of(context).textTheme;
+    final icon = _iconForTitle(item.title);
 
     return Container(
       width: double.infinity,
@@ -54,7 +75,7 @@ class MyCouponsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  item.icon,
+                  icon,
                   size: 22,
                   color: const Color(0xFF1B5E3B),
                 ),
@@ -65,21 +86,23 @@ class MyCouponsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.title,
+                      item.title.isNotEmpty ? item.title : 'Reward Coupon',
                       style: (textTheme.titleMedium ?? AppTypography.heading).copyWith(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.description,
-                      style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                    if (item.description.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        item.description,
+                        style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -87,7 +110,7 @@ class MyCouponsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // "Redeemed · 20 points" chip
+          // "Redeemed · X points" chip
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
@@ -95,7 +118,7 @@ class MyCouponsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(18),
             ),
             child: Text(
-              'Redeemed · ${item.points} points',
+              'Redeemed · ${item.cost} points',
               style: const TextStyle(
                 fontFamily: AppTypography.fontFamily,
                 color: Color(0xFF145A32),
@@ -129,7 +152,7 @@ class MyCouponsScreen extends StatelessWidget {
                       item.code,
                       style: const TextStyle(
                         fontFamily: AppTypography.fontFamily,
-                        fontSize: 28,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF145A32),
                         letterSpacing: 1.2,
@@ -139,14 +162,14 @@ class MyCouponsScreen extends StatelessWidget {
                   InkWell(
                     onTap: () => _copyCode(context, item.code),
                     borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 6,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(
                             Icons.copy_outlined,
                             size: 18,
@@ -174,7 +197,7 @@ class MyCouponsScreen extends StatelessWidget {
 
           // Redemption caption
           Text(
-            'Redeemed ${item.dateText} · Demonstration only',
+            'Redeemed ${_formatDate(item.redeemedAt)}',
             style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
               color: AppColors.textSecondary,
               fontSize: 13,
@@ -237,6 +260,9 @@ class MyCouponsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? '';
+    final firestoreService = FirestoreService();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -244,148 +270,132 @@ class MyCouponsScreen extends StatelessWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Back Arrow & Title
+              Row(
                 children: [
-                  // Top Back Arrow & Title
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Color(0xFF145A32),
-                          size: 26,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/profile');
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        'My Coupons',
-                        style: (textTheme.headlineSmall ?? AppTypography.title).copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Subtitle
-                  Text(
-                    'A little recognition for your good actions.',
-                    style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Info note
-                  const InfoNote(
-                    text: 'After redemption · Demo reward, not a real offer',
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Coupons List or Empty State
-                  if (redemptions.isEmpty)
-                    _buildEmptyState(context)
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: redemptions.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        return _buildCouponCard(context, redemptions[index]);
-                      },
-                    ),
-                  const SizedBox(height: 20),
-
-                  // Mint TipBanner: Good actions add up
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEAF5EE),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: const Color(0xFF145A32).withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Good actions add up',
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF145A32),
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          'Continue reporting breeding sites to earn points and explore more sample rewards.',
-                          style: TextStyle(
-                            fontFamily: AppTypography.fontFamily,
-                            fontSize: 14,
-                            color: Color(0xFF145A32),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Outlined "Explore Rewards" button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.go('/rewards'),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.surface,
-                        foregroundColor: const Color(0xFF145A32),
-                        side: const BorderSide(
-                          color: Color(0xFFD0D7D0),
+                  InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFE8EDE8),
                           width: 1.2,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
                       ),
-                      icon: const Icon(
-                        Icons.card_giftcard_outlined,
-                        size: 22,
-                        color: Color(0xFF145A32),
-                      ),
-                      label: const Text(
-                        'Explore Rewards',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF145A32),
-                        ),
+                      child: const Icon(
+                        Icons.arrow_back,
+                        size: 20,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(width: 14),
+                  Text(
+                    'My Coupons',
+                    style: (textTheme.headlineSmall ?? AppTypography.title).copyWith(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+
+              // Subtitle
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  'Your redeemed rewards ready to use.',
+                  style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Stream redemptions from Firestore
+              StreamBuilder<List<RedemptionModel>>(
+                stream: uid.isNotEmpty
+                    ? firestoreService.watchUserRedemptions(uid)
+                    : Stream.value([]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final redemptions = snapshot.data ?? [];
+
+                  if (redemptions.isEmpty) {
+                    return _buildEmptyState(context);
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: redemptions.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 14),
+                    itemBuilder: (context, index) {
+                      return _buildCouponCard(context, redemptions[index]);
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // Outlined "Explore Rewards" button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/rewards'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: const Color(0xFF145A32),
+                    side: const BorderSide(
+                      color: Color(0xFFD0D7D0),
+                      width: 1.2,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.card_giftcard_outlined,
+                    size: 22,
+                    color: Color(0xFF145A32),
+                  ),
+                  label: const Text(
+                    'Explore Rewards',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF145A32),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
           ),
-        );
+        ),
+      ),
+    );
   }
 }
 

@@ -1,33 +1,43 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme_proposal.dart';
-import 'dummy_data.dart';
+import '../../models/report_model.dart';
+import '../../services/firestore_service.dart';
 import 'widgets/widgets.dart';
 
 /// Screen displaying submitted dengue breeding site reports with filter options.
+/// Streams live reports from Firestore where uid == currentUser.uid.
 class MyReportsScreen extends StatefulWidget {
-  final List<DummyReport> reports;
-
-  const MyReportsScreen({
-    super.key,
-    this.reports = dummyReports,
-  });
+  const MyReportsScreen({super.key});
 
   @override
   State<MyReportsScreen> createState() => _MyReportsScreenState();
 }
 
 class _MyReportsScreenState extends State<MyReportsScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
   String _selectedFilter = 'all'; // 'all' | 'pending' | 'reviewed'
 
-  List<DummyReport> get _filteredReports {
+  List<ReportModel> _filterReports(List<ReportModel> all) {
     if (_selectedFilter == 'pending') {
-      return widget.reports.where((r) => r.isPending).toList();
+      return all.where((r) => r.status.toLowerCase() == 'pending').toList();
     }
     if (_selectedFilter == 'reviewed') {
-      return widget.reports.where((r) => r.isReviewed).toList();
+      return all.where((r) => r.status.toLowerCase() != 'pending').toList();
     }
-    return widget.reports;
+    return all;
+  }
+
+  String _formatDate(DateTime dt) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · $hour:$minute $ampm';
   }
 
   Widget _buildFilterChip(String label, String value) {
@@ -59,7 +69,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
-  Widget _buildReportCard(BuildContext context, DummyReport report) {
+  Widget _buildReportCard(BuildContext context, ReportModel report) {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
@@ -95,15 +105,39 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            report.location,
+            '${report.lat.toStringAsFixed(4)}° N, ${report.lng.toStringAsFixed(4)}° E',
             style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 4),
+          if (report.description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              report.description,
+              style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (report.aiReason != null && report.aiReason!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'AI feedback: ${report.aiReason!}',
+              style: const TextStyle(
+                fontFamily: AppTypography.fontFamily,
+                fontSize: 12,
+                color: AppColors.error,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
           Text(
-            report.dateText,
+            _formatDate(report.createdAt),
             style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -150,7 +184,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'No reports match the selected filter.',
+            'No reports match your current filter.',
             style: TextStyle(
               fontFamily: AppTypography.fontFamily,
               fontSize: 13,
@@ -166,7 +200,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final filtered = _filteredReports;
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -222,12 +257,6 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // Info note
-              InfoNote(
-                text: '${widget.reports.length} sample reports · Fictional locations',
-              ),
               const SizedBox(height: 16),
 
               // Filter Chips
@@ -245,25 +274,45 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Report Cards or Empty State
-              if (filtered.isEmpty)
-                _buildEmptyState(context)
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    return _buildReportCard(context, filtered[index]);
-                  },
-                ),
+              // Stream reports from Firestore
+              StreamBuilder<List<ReportModel>>(
+                stream: uid.isNotEmpty
+                    ? _firestoreService.watchUserReports(uid)
+                    : Stream.value([]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final allReports = snapshot.data ?? [];
+                  final filtered = _filterReports(allReports);
+
+                  if (filtered.isEmpty) {
+                    return _buildEmptyState(context);
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(context, filtered[index]);
+                    },
+                  );
+                },
+              ),
               const SizedBox(height: 24),
 
               // Mint TipBanner at the bottom
               const TipBanner(
                 text:
-                    'Reports are reviewed before appearing as valid markers on the map. A clearer photo or location may be requested.',
+                    'Reports are reviewed automatically by AI before appearing as valid markers on the map.',
               ),
               const SizedBox(height: 20),
             ],

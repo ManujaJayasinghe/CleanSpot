@@ -1,10 +1,20 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../app/theme_proposal.dart';
+import '../../models/report_model.dart';
+import '../../services/firestore_service.dart';
 
 /// Screen allowing community members to report potential mosquito breeding sites.
-/// Matches Figma Page 4 ("Report a Breeding Site").
+/// Captures photo via camera/gallery, captures live GPS, compresses photo (max 800px / 70% JPEG / <300KB),
+/// saves image to `reportPhotos/{reportId}` as photoBase64, and saves report to Firestore `reports/{reportId}`.
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -14,11 +24,17 @@ class ReportScreen extends StatefulWidget {
 
 class _ReportScreenState extends State<ReportScreen> {
   final _descriptionController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  final FirestoreService _firestoreService = FirestoreService();
 
   String _selectedCategory = 'Stagnant Water';
-  String _locationText = 'Latitude — · Longitude —';
+  String _locationText = 'Tap refresh to capture live GPS';
   bool _isLocating = false;
-  String? _selectedPhotoUrl;
+  bool _isSubmitting = false;
+
+  File? _imageFile;
+  double? _lat;
+  double? _lng;
 
   final List<String> _categories = const [
     'Stagnant Water',
@@ -29,41 +45,212 @@ class _ReportScreenState extends State<ReportScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _refreshLocation();
+  }
+
+  @override
   void dispose() {
     _descriptionController.dispose();
     super.dispose();
   }
 
-  void _simulatePhotoPick(String source) {
-    setState(() {
-      _selectedPhotoUrl =
-          'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=400&auto=format&fit=crop&q=80';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Photo selected from $source'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: AppColors.primaryDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  void _refreshLocation() async {
-    setState(() => _isLocating = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      setState(() {
-        _isLocating = false;
-        _locationText = '6.9271° N · 79.8612° E (Colombo)';
-      });
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final picked = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        setState(() {
+          _imageFile = File(picked.path);
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick photo: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
-  void _submitReport() {
-    // Demo flow: show the AI verification screen, then the approved result.
-    context.go('/report/verifying', extra: _selectedPhotoUrl);
+  Future<void> _refreshLocation() async {
+    setState(() => _isLocating = true);
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          setState(() {
+            _isLocating = false;
+            _locationText = 'Location services are disabled.';
+          });
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            setState(() {
+              _isLocating = false;
+              _locationText = 'Location permissions denied.';
+            });
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _isLocating = false;
+            _locationText = 'Location permissions permanently denied.';
+          });
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      if (mounted) {
+        setState(() {
+          _lat = position.latitude;
+          _lng = position.longitude;
+          _locationText =
+              '${position.latitude.toStringAsFixed(5)}° N · ${position.longitude.toStringAsFixed(5)}° E';
+          _isLocating = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLocating = false;
+          _locationText = 'Failed to get location: $e';
+        });
+      }
+    }
+  }
+
+  /// Compresses the image strictly according to requirements:
+  /// - Max 800px width/height
+  /// - 70% JPEG quality
+  /// - Enforced hard cap under 300 KB
+  Future<String> _compressAndEncodeBase64(File file) async {
+    final rawBytes = await file.readAsBytes();
+    final decoded = img.decodeImage(rawBytes);
+
+    if (decoded == null) {
+      // Fallback: encode raw bytes
+      return base64Encode(rawBytes);
+    }
+
+    int targetDim = 800;
+    img.Image resized = decoded;
+    if (decoded.width > targetDim || decoded.height > targetDim) {
+      if (decoded.width >= decoded.height) {
+        resized = img.copyResize(decoded, width: targetDim);
+      } else {
+        resized = img.copyResize(decoded, height: targetDim);
+      }
+    }
+
+    int quality = 70;
+    List<int> compressed = img.encodeJpg(resized, quality: quality);
+
+    // Hard cap: guarantee compressed size is under 300 KB (307,200 bytes)
+    const int maxBytes = 300 * 1024;
+    while (compressed.length > maxBytes && quality > 20) {
+      quality -= 15;
+      targetDim = (targetDim * 0.8).toInt();
+      resized = img.copyResize(decoded, width: targetDim);
+      compressed = img.encodeJpg(resized, quality: quality);
+    }
+
+    return base64Encode(compressed);
+  }
+
+  Future<void> _submitReport() async {
+    if (_imageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please take or choose a photo of the breeding site.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_lat == null || _lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please capture your current GPS location first.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'anonymous_user';
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // 1. Compress image to max 800px / 70% JPEG and cap under 300 KB
+      final base64String = await _compressAndEncodeBase64(_imageFile!);
+
+      // 2. Prepare report model
+      final report = ReportModel(
+        id: '',
+        uid: uid,
+        photoId: '', // submitReport populates this with reportId
+        imageUrl: '',
+        lat: _lat!,
+        lng: _lng!,
+        type: _selectedCategory,
+        description: _descriptionController.text.trim(),
+        status: 'pending',
+        location: GeoPoint(_lat!, _lng!),
+        createdAt: DateTime.now(),
+        lastConfirmedAt: DateTime.now(),
+      );
+
+      // 3. Save to reports/{id} and reportPhotos/{id} in Firestore
+      await _firestoreService.submitReport(
+        report,
+        photoBase64: base64String,
+      );
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      // Pass data URL format so downstream widgets/screens can display immediately
+      final previewDataUrl = 'data:image/jpeg;base64,$base64String';
+      context.go('/report/verifying', extra: previewDataUrl);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error submitting report: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Widget _buildPhotoSection(BuildContext context) {
@@ -100,14 +287,14 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           const SizedBox(height: 16),
 
-          if (_selectedPhotoUrl != null) ...[
+          if (_imageFile != null) ...[
             Stack(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.network(
-                    _selectedPhotoUrl!,
-                    height: 150,
+                  child: Image.file(
+                    _imageFile!,
+                    height: 180,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
@@ -116,7 +303,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   top: 8,
                   right: 8,
                   child: InkWell(
-                    onTap: () => setState(() => _selectedPhotoUrl = null),
+                    onTap: () => setState(() => _imageFile = null),
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
@@ -141,7 +328,7 @@ class _ReportScreenState extends State<ReportScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _simulatePhotoPick('Camera'),
+                  onPressed: () => _pickPhoto(ImageSource.camera),
                   icon: const Icon(Icons.camera_alt_outlined, size: 20),
                   label: const Text('Camera'),
                   style: OutlinedButton.styleFrom(
@@ -158,7 +345,7 @@ class _ReportScreenState extends State<ReportScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _simulatePhotoPick('Gallery'),
+                  onPressed: () => _pickPhoto(ImageSource.gallery),
                   icon: const Icon(Icons.photo_library_outlined, size: 20),
                   label: const Text('Gallery'),
                   style: OutlinedButton.styleFrom(
@@ -400,7 +587,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _submitReport,
+                  onPressed: _isSubmitting ? null : _submitReport,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.surface,
@@ -409,14 +596,23 @@ class _ReportScreenState extends State<ReportScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Submit Report',
-                    style: TextStyle(
-                      fontFamily: AppTypography.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: AppColors.surface,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Submit Report',
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 20),
