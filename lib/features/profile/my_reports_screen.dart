@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -17,14 +18,11 @@ class MyReportsScreen extends StatefulWidget {
 
 class _MyReportsScreenState extends State<MyReportsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  String _selectedFilter = 'all'; // 'all' | 'pending' | 'reviewed'
+  String _selectedFilter = 'all'; // 'all' | 'in_progress'
 
   List<ReportModel> _filterReports(List<ReportModel> all) {
-    if (_selectedFilter == 'pending') {
+    if (_selectedFilter == 'in_progress') {
       return all.where((r) => r.status.toLowerCase() == 'pending').toList();
-    }
-    if (_selectedFilter == 'reviewed') {
-      return all.where((r) => r.status.toLowerCase() != 'pending').toList();
     }
     return all;
   }
@@ -45,15 +43,15 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
     return InkWell(
       onTap: () => setState(() => _selectedFilter = value),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryLight : AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
-            width: 1,
+            width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Text(
@@ -69,78 +67,153 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
+  Widget _buildReportThumbnail(ReportModel report) {
+    if (report.imageUrl.isNotEmpty) {
+      if (report.imageUrl.startsWith('data:image') || !report.imageUrl.startsWith('http')) {
+        try {
+          final cleanBase64 = report.imageUrl.contains(',')
+              ? report.imageUrl.split(',').last
+              : report.imageUrl;
+          return Image.memory(
+            base64Decode(cleanBase64.trim()),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.image_outlined,
+              color: AppColors.primary,
+              size: 28,
+            ),
+          );
+        } catch (_) {}
+      } else {
+        return Image.network(
+          report.imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const Icon(
+            Icons.image_outlined,
+            color: AppColors.primary,
+            size: 28,
+          ),
+        );
+      }
+    }
+
+    return const Icon(
+      Icons.image_outlined,
+      color: AppColors.primary,
+      size: 28,
+    );
+  }
+
   Widget _buildReportCard(BuildContext context, ReportModel report) {
     final textTheme = Theme.of(context).textTheme;
+    final isApproved = report.status.toLowerCase() == 'valid' ||
+        report.status.toLowerCase() == 'approved';
+    final pointsText = isApproved ? '+10 pts' : 'Not awarded yet';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.border, width: 1),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  report.type,
-                  style: (textTheme.titleMedium ?? AppTypography.heading).copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+          // Left thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 68,
+              height: 68,
+              color: AppColors.primaryLight,
+              child: _buildReportThumbnail(report),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Details column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Status Chip
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        report.type,
+                        style: (textTheme.titleMedium ?? AppTypography.heading).copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    StatusChip.fromStatus(
+                      text: report.status,
+                      status: report.status,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+
+                // Location
+                Text(
+                  '${report.lat.toStringAsFixed(4)}° N, ${report.lng.toStringAsFixed(4)}° E',
+                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              StatusChip.fromStatus(
-                text: report.status,
-                status: report.status,
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${report.lat.toStringAsFixed(4)}° N, ${report.lng.toStringAsFixed(4)}° E',
-            style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          if (report.description.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              report.description,
-              style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          if (report.aiReason != null && report.aiReason!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              'AI feedback: ${report.aiReason!}',
-              style: const TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 12,
-                color: AppColors.error,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          Text(
-            _formatDate(report.createdAt),
-            style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+                const SizedBox(height: 2),
+
+                // Date
+                Text(
+                  _formatDate(report.createdAt),
+                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Bottom row: AI Note + Points
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        report.aiReason != null && report.aiReason!.isNotEmpty
+                            ? 'AI: ${report.aiReason!}'
+                            : (isApproved
+                                ? 'AI: Verified site.'
+                                : 'AI: Queued for validation.'),
+                        style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      pointsText,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isApproved
+                            ? AppColors.primaryDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -207,72 +280,64 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Bar with back arrow
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        size: 20,
-                        color: AppColors.textPrimary,
-                      ),
+              // Top Bar with back arrow if navigator can pop
+              if (Navigator.of(context).canPop()) ...[
+                InkWell(
+                  onTap: () => Navigator.of(context).maybePop(),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border, width: 1),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    'My Reports',
-                    style: (textTheme.headlineSmall ?? AppTypography.title).copyWith(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                    child: const Icon(
+                      Icons.arrow_back,
+                      size: 20,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Screen Title
+              Text(
+                'My Reports',
+                style: (textTheme.headlineSmall ?? AppTypography.title).copyWith(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
               // Subtitle
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  'Small actions, recorded with care.',
-                  style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
+              Text(
+                'Follow your reports from upload to validation.',
+                style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
                 ),
               ),
               const SizedBox(height: 16),
 
               // Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip('All reports', 'all'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Pending', 'pending'),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Reviewed', 'reviewed'),
-                  ],
-                ),
+              Row(
+                children: [
+                  _buildFilterChip('All reports', 'all'),
+                  const SizedBox(width: 10),
+                  _buildFilterChip('In progress', 'in_progress'),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Stream reports from Firestore
               StreamBuilder<List<ReportModel>>(
@@ -307,14 +372,20 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 24),
-
-              // Mint TipBanner at the bottom
-              const TipBanner(
-                text:
-                    'Reports are reviewed automatically by AI before appearing as valid markers on the map.',
-              ),
               const SizedBox(height: 20),
+
+              // Footnote
+              Center(
+                child: Text(
+                  'Only valid reports earn 10 points and appear on the map.',
+                  textAlign: TextAlign.center,
+                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

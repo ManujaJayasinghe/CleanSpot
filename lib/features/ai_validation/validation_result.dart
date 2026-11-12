@@ -14,6 +14,16 @@ enum SiteCategory {
 
   final String wireValue;
 
+  /// Short name to show to the user.
+  String get label => switch (this) {
+        stagnantWater => 'Stagnant water',
+        tire => 'Discarded tyre',
+        blockedDrain => 'Blocked drain',
+        container => 'Open container',
+        other => 'Possible breeding site',
+        none => 'No breeding site',
+      };
+
   static SiteCategory? fromWire(Object? value) {
     for (final c in values) {
       if (c.wireValue == value) return c;

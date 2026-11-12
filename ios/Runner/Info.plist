@@ -4,6 +4,12 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>CleanSpot uses the camera so you can photograph a possible mosquito breeding site for your report.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CleanSpot uses your location to record where the breeding site is when you take the photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CleanSpot only uses live camera photos for reports. This is declared because the photo picker library requires it.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

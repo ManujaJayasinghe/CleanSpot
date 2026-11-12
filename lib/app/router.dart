@@ -12,9 +12,7 @@ import '../features/map/map_screen.dart';
 import '../features/profile/my_coupons_screen.dart';
 import '../features/profile/my_reports_screen.dart';
 import '../features/profile/profile_screen.dart';
-import '../features/report/report_result_screen.dart';
 import '../features/report/report_screen.dart';
-import '../features/report/report_verification_screen.dart';
 import '../features/rewards/rewards_screen.dart';
 import '../features/symptoms/symptoms_screen.dart';
 import 'home_shell.dart';
@@ -55,22 +53,7 @@ final router = GoRouter(
       routes: [
         GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
         GoRoute(path: '/map', builder: (_, _) => const MapScreen()),
-        GoRoute(
-          path: '/report',
-          builder: (_, _) => const ReportScreen(),
-          routes: [
-            GoRoute(
-              path: 'verifying',
-              builder: (_, state) =>
-                  ReportVerificationScreen(photoUrl: state.extra as String?),
-            ),
-            GoRoute(
-              path: 'result',
-              builder: (_, state) =>
-                  ReportResultScreen(photoUrl: state.extra as String?),
-            ),
-          ],
-        ),
+        GoRoute(path: '/report', builder: (_, _) => const ReportScreen()),
         GoRoute(path: '/rewards', builder: (_, _) => const RewardsScreen()),
         GoRoute(path: '/analysis', builder: (_, _) => const AnalysisScreen()),
         GoRoute(path: '/symptoms', builder: (_, _) => const SymptomsScreen()),

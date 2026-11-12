@@ -3,4 +3,7 @@
 const String kAiModelName = 'gemini-3.5-flash-lite';
 
 /// How long a single AI request may take before it counts as a failure.
-const Duration kAiRequestTimeout = Duration(seconds: 20);
+const Duration kAiRequestTimeout = Duration(seconds: 30);
+
+/// A photo must be judged a breeding site with at least this confidence.
+const double kMinConfidence = 0.7;

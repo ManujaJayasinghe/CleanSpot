@@ -4,28 +4,36 @@ import '../../../app/theme_proposal.dart';
 
 /// Available status chip types with associated visual palettes.
 enum StatusChipType {
+  valid,
   pending,
+  checking,
+  rejected,
   reviewed,
   needsDetail;
 
   /// Helper parser for dynamic or backend status strings
   static StatusChipType fromString(String value) {
     final lower = value.toLowerCase();
-    if (lower.contains('pending')) return StatusChipType.pending;
-    if (lower.contains('reviewed') || lower.contains('approved') || lower.contains('valid')) {
+    if (lower == 'valid' || lower.contains('valid') || lower.contains('approved')) {
+      return StatusChipType.valid;
+    }
+    if (lower == 'checking' || lower.contains('checking')) {
+      return StatusChipType.checking;
+    }
+    if (lower.contains('pending')) {
+      return StatusChipType.pending;
+    }
+    if (lower.contains('reviewed')) {
       return StatusChipType.reviewed;
     }
-    if (lower.contains('detail') || lower.contains('rejected') || lower.contains('error') || lower.contains('needs')) {
-      return StatusChipType.needsDetail;
+    if (lower.contains('rejected') || lower.contains('detail') || lower.contains('error')) {
+      return StatusChipType.rejected;
     }
     return StatusChipType.pending;
   }
 }
 
 /// A pill badge displaying state for reports or activities.
-/// - pending: orange background and text
-/// - reviewed: green background and text
-/// - needsDetail: red background and text
 class StatusChip extends StatelessWidget {
   final String text;
   final StatusChipType type;
@@ -55,14 +63,20 @@ class StatusChip extends StatelessWidget {
     final Color textColor;
 
     switch (type) {
-      case StatusChipType.pending:
-        bgColor = AppColors.warningBg;
-        textColor = AppColors.warningText;
-        break;
+      case StatusChipType.valid:
       case StatusChipType.reviewed:
         bgColor = AppColors.primaryLight;
         textColor = AppColors.primaryDark;
         break;
+      case StatusChipType.pending:
+        bgColor = AppColors.warningBg;
+        textColor = AppColors.warningText;
+        break;
+      case StatusChipType.checking:
+        bgColor = const Color(0xFFFFEDE0);
+        textColor = const Color(0xFFB8501A);
+        break;
+      case StatusChipType.rejected:
       case StatusChipType.needsDetail:
         bgColor = AppColors.errorBg;
         textColor = AppColors.errorText;

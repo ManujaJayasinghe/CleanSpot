@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:firebase_ai/firebase_ai.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
 import 'ai_config.dart';
 import 'ai_prompts.dart';
@@ -82,12 +84,30 @@ class AiValidationService {
       return const ValidationResult.error('The photo is empty.');
     }
     try {
+      if (kDebugMode) {
+        // Debug-only timing: fetch the App Check token on its own first so its
+        // cost shows up separately from the Gemini call (the token is cached
+        // afterwards, so the Gemini call below does not pay for it again).
+        final sw = Stopwatch()..start();
+        try {
+          await FirebaseAppCheck.instance.getToken();
+          debugPrint('AI TIMING: appCheckToken=${sw.elapsedMilliseconds} ms');
+        } catch (e) {
+          debugPrint('AI TIMING: appCheckToken failed after '
+              '${sw.elapsedMilliseconds} ms: $e');
+        }
+      }
+      final geminiTimer = Stopwatch()..start();
       final response = await _validationModel.generateContent([
         Content.multi([
           TextPart(kValidationUserPrompt),
           InlineDataPart('image/jpeg', jpegBytes),
         ]),
       ]).timeout(kAiRequestTimeout);
+      if (kDebugMode) {
+        debugPrint('AI TIMING: gemini=${geminiTimer.elapsedMilliseconds} ms '
+            '(photo ${jpegBytes.length} bytes)');
+      }
       return ValidationResult.parse(response.text);
     } catch (e) {
       // Includes TimeoutException and FirebaseAIException.

@@ -10,12 +10,16 @@ class ReportModel {
   final String type;
   final String description;
   final String status; // 'pending' | 'valid' | 'rejected'
-  final String? aiReason;
   final GeoPoint location;
   final String geohash;
   final int confirmationCount;
   final DateTime createdAt;
   final DateTime lastConfirmedAt;
+
+  /// Set by the AI photo check; null on reports created before it existed.
+  final String? aiCategory;
+  final double? aiConfidence;
+  final String? aiReason;
 
   const ReportModel({
     required this.id,
@@ -27,12 +31,14 @@ class ReportModel {
     this.type = 'Other',
     this.description = '',
     required this.status,
-    this.aiReason,
     required this.location,
     this.geohash = '',
     this.confirmationCount = 0,
     required this.createdAt,
     required this.lastConfirmedAt,
+    this.aiCategory,
+    this.aiConfidence,
+    this.aiReason,
   });
 
   factory ReportModel.fromMap(String id, Map<String, dynamic> map) {
@@ -58,13 +64,15 @@ class ReportModel {
       type: map['type'] as String? ?? 'Other',
       description: map['description'] as String? ?? '',
       status: map['status'] as String? ?? 'pending',
-      aiReason: map['aiReason'] as String?,
       location: loc,
       geohash: map['geohash'] as String? ?? '',
       confirmationCount: (map['confirmationCount'] as num?)?.toInt() ?? 0,
       createdAt: created,
       lastConfirmedAt:
           (map['lastConfirmedAt'] as Timestamp?)?.toDate() ?? created,
+      aiCategory: map['aiCategory'] as String?,
+      aiConfidence: (map['aiConfidence'] as num?)?.toDouble(),
+      aiReason: map['aiReason'] as String?,
     );
   }
 
@@ -78,12 +86,14 @@ class ReportModel {
       'type': type,
       'description': description,
       'status': status,
-      if (aiReason != null) 'aiReason': aiReason,
       'location': location,
       'geohash': geohash,
       'confirmationCount': confirmationCount,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastConfirmedAt': Timestamp.fromDate(lastConfirmedAt),
+      if (aiCategory != null) 'aiCategory': aiCategory,
+      if (aiConfidence != null) 'aiConfidence': aiConfidence,
+      if (aiReason != null) 'aiReason': aiReason,
       // Backwards compatibility for existing team code
       'reporterId': uid,
       'photoUrl': imageUrl,

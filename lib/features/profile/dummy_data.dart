@@ -109,6 +109,9 @@ class DummyReport {
   final String location;
   final String dateText;
   final String status;
+  final String? imageUrl;
+  final String? aiNote;
+  final String? pointsText;
 
   const DummyReport({
     this.id = '',
@@ -116,36 +119,70 @@ class DummyReport {
     required this.location,
     required this.dateText,
     required this.status,
+    this.imageUrl,
+    this.aiNote,
+    this.pointsText,
   });
 
-  // Helper flags for UI badges
+  // Helper flags for UI filters and badges
+  bool get isValid =>
+      status.toLowerCase() == 'valid' ||
+      status.toLowerCase().contains('valid') ||
+      status.toLowerCase().contains('approved');
   bool get isPending => status.toLowerCase().contains('pending');
-  bool get isReviewed => status.toLowerCase().contains('reviewed');
-  bool get isNeedsDetail => status.toLowerCase().contains('detail');
+  bool get isChecking => status.toLowerCase().contains('checking');
+  bool get isRejected =>
+      status.toLowerCase().contains('rejected') ||
+      status.toLowerCase().contains('detail');
+  bool get isInProgress => isPending || isChecking;
+  bool get isReviewed => isValid || status.toLowerCase().contains('reviewed');
 }
 
-/// 3 sample breeding site reports matching mockup states.
+/// 4 sample breeding site reports matching Figma / Mockup Page 5 ("My Reports").
 const List<DummyReport> dummyReports = [
   DummyReport(
     id: 'report-1',
-    type: 'Stagnant water',
+    type: 'Discarded tyre',
     location: 'Sample campus garden',
-    dateText: '12 Oct · 9:15 AM',
-    status: 'Pending review',
+    dateText: '13 Oct · 9:41 AM',
+    status: 'Valid',
+    imageUrl:
+        'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=400&auto=format&fit=crop&q=80',
+    aiNote: 'AI: Standing water detected.',
+    pointsText: '+10 points',
   ),
   DummyReport(
     id: 'report-2',
-    type: 'Blocked drain',
-    location: 'Sample community lane',
-    dateText: '10 Oct · 4:40 PM',
-    status: 'Reviewed',
+    type: 'Open container',
+    location: 'Sample volunteer centre',
+    dateText: '13 Oct · 10:15 AM',
+    status: 'Pending',
+    imageUrl:
+        'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=400&auto=format&fit=crop&q=80',
+    aiNote: 'AI: Queued for validation.',
+    pointsText: 'Not awarded yet',
   ),
   DummyReport(
     id: 'report-3',
+    type: 'Blocked drain',
+    location: 'Sample community lane',
+    dateText: '13 Oct · 10:00 AM',
+    status: 'Checking',
+    imageUrl:
+        'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=400&auto=format&fit=crop&q=80',
+    aiNote: 'AI: Checking water and duplicates.',
+    pointsText: 'Not awarded yet',
+  ),
+  DummyReport(
+    id: 'report-4',
     type: 'Containers',
     location: 'Sample volunteer centre',
     dateText: '8 Oct · 11:20 AM',
-    status: 'Needs detail',
+    status: 'Rejected',
+    imageUrl:
+        'https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=400&auto=format&fit=crop&q=80',
+    aiNote: 'AI: Duplicate of an existing report.',
+    pointsText: '0 points',
   ),
 ];
 

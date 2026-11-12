@@ -57,6 +57,9 @@ Stores reports of potential mosquito-breeding sites submitted by community membe
 | `confirmationCount` | `int` | Number of community/admin confirmations for duplicate reporting. |
 | `createdAt` | `timestamp` | Timestamp when the report was submitted. |
 | `lastConfirmedAt` | `timestamp` | Timestamp when the report was last confirmed/verified. |
+| `aiCategory` | `string` (optional) | Site type found by the AI photo check: `'stagnant_water'`, `'tire'`, `'blocked_drain'`, `'container'` or `'other'`. Absent on older reports. |
+| `aiConfidence` | `number` (optional) | AI confidence that the photo shows a breeding site, from 0 to 1. Absent on older reports. |
+| `aiReason` | `string` (optional) | Short user-friendly explanation from the AI check. Absent on older reports. |
 
 ---
 
