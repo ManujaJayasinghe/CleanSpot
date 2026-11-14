@@ -3,8 +3,9 @@
 Checks whether a report photo shows a possible dengue mosquito breeding site,
 using Gemini through Firebase AI Logic (Gemini Developer API).
 
-Work in progress. Camera, GPS, the AI check, the decision and the Report screen
-flow are done. The duplicate check is still a stub (see below).
+Camera, GPS, the AI check, the duplicate check, the decision and the Report
+screen flow are done. Saving reports and awarding points belong to the
+submission owner (see "Hook for report submission and points").
 
 ## What is here
 
@@ -16,7 +17,9 @@ flow are done. The duplicate check is still a stub (see below).
 | `validation_result.dart` | `ValidationResult` and `SiteCategory`. |
 | `capture_service.dart` | `captureReportPhoto()`: live camera photo plus a GPS fix. |
 | `capture_result.dart` | `CaptureResult` (photo + GPS, or why it failed). |
-| `duplicate_check.dart` | `isDuplicate(lat, lng)`. **Stub: always false** until Step 8. |
+| `duplicate_check.dart` | `isDuplicate(lat, lng)`: is there an approved report within 20 m from the last 7 days? See "Duplicate check". |
+| `geohash.dart` | `encode(lat, lng, precision)`, `bounds(hash)`, `neighbours(hash)` (the 8 surrounding cells). No package. |
+| `haversine.dart` | `haversineMeters(lat1, lng1, lat2, lng2)`. |
 | `report_decision.dart` | `decide(ai, capture, isDuplicate)`: the eligibility rule. |
 | `report_check_controller.dart` | Runs validatePhoto, then the duplicate check, then `decide()`. |
 | `report_outcome.dart` | `ReportOutcome` and the `onDecision` callback type. |
@@ -64,10 +67,40 @@ What the submission owner should do:
   `aiConfidence` and `aiReason` from `outcome.validation`. These optional fields
   are on `ReportModel` and documented in `docs/DATA_MODEL.md`.
 - `confirmationCount` is for community "still there" confirmations, not a gate.
-- Write `geohash` with the encoder from `geohash.dart` (precision 9) once it is
-  added in Step 8, so the duplicate check can find the report.
+- **Required for the duplicate check to work.** Save these fields exactly
+  like this, or the report will never be found as a duplicate:
+  - `geohash`: `encode(outcome.capture.latitude!, outcome.capture.longitude!, 9)`
+    from `lib/features/ai_validation/geohash.dart` (our encoder, precision 9).
+  - `createdAt`: `FieldValue.serverTimestamp()`. Do not use the phone's
+    clock. Note that `ReportModel.toMap()` writes `Timestamp.fromDate(createdAt)`,
+    so override that field when you write the document.
+  - `status`: `'approved'`.
+  - `location`: `GeoPoint(latitude, longitude)` (the same capture fix).
 - The Approved screen says "Eligible for 10 points"; actually awarding the
   points is up to the submission/points owner.
+
+## Duplicate check
+
+`isDuplicate(lat, lng)` in `duplicate_check.dart`:
+
+1. Takes the precision-6 geohash of the point (a cell about 1.2 km x 0.6 km)
+   and its 8 neighbours. Together they always cover the 20 m radius.
+2. Runs one range query per cell on `reports`, in parallel:
+   `orderBy('geohash').startAt([prefix]).endAt([prefix + '\uf8ff'])`. Reads
+   come from the **server only**. Offline, the queries fail; they do not
+   silently use the cache.
+3. Filters the results on the phone (`matchesDuplicate`): `status ==
+   'approved'`, `createdAt` within the last 7 days, and Haversine distance
+   ≤ 20 m from `location`. Documents missing `createdAt` or `location` are
+   ignored.
+4. Returns true if anything matches. If any query fails it **throws**, and the
+   check controller shows the retryable error. A failed lookup is never treated
+   as "not a duplicate".
+
+Only a single-field index on `geohash` is needed, which Firestore creates
+automatically. Status and date are filtered on the phone, so no composite index
+is needed. Each check reads every report in 9 cells (about 3.3 km x 1.8 km).
+That is fine at coursework scale.
 
 ## Demo controls
 
