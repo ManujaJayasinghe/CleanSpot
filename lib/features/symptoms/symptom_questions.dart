@@ -1,4 +1,4 @@
-/// lib/features/symptoms/symptom_questions.dart
+// lib/features/symptoms/symptom_questions.dart
 import 'package:flutter/material.dart';
 
 /// App colour palette (shared by all three symptom files).

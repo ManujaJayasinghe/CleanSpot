@@ -1,31 +1,41 @@
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme_proposal.dart';
-import 'dummy_data.dart';
+import '../../models/report_model.dart';
+import '../../services/firestore_service.dart';
 import 'widgets/widgets.dart';
 
 /// Screen displaying submitted dengue breeding site reports with filter options.
-/// Matches Figma / Mockup Image 5 ("My Reports").
+/// Streams live reports from Firestore where uid == currentUser.uid.
 class MyReportsScreen extends StatefulWidget {
-  final List<DummyReport> reports;
-
-  const MyReportsScreen({
-    super.key,
-    this.reports = dummyReports,
-  });
+  const MyReportsScreen({super.key});
 
   @override
   State<MyReportsScreen> createState() => _MyReportsScreenState();
 }
 
 class _MyReportsScreenState extends State<MyReportsScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
   String _selectedFilter = 'all'; // 'all' | 'in_progress'
 
-  List<DummyReport> get _filteredReports {
+  List<ReportModel> _filterReports(List<ReportModel> all) {
     if (_selectedFilter == 'in_progress') {
-      return widget.reports.where((r) => r.isInProgress).toList();
+      return all.where((r) => r.status.toLowerCase() == 'pending').toList();
     }
-    return widget.reports;
+    return all;
+  }
+
+  String _formatDate(DateTime dt) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · $hour:$minute $ampm';
   }
 
   Widget _buildFilterChip(String label, String value) {
@@ -57,9 +67,48 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     );
   }
 
-  Widget _buildReportCard(BuildContext context, DummyReport report) {
+  Widget _buildReportThumbnail(ReportModel report) {
+    if (report.imageUrl.isNotEmpty) {
+      if (report.imageUrl.startsWith('data:image') || !report.imageUrl.startsWith('http')) {
+        try {
+          final cleanBase64 = report.imageUrl.contains(',')
+              ? report.imageUrl.split(',').last
+              : report.imageUrl;
+          return Image.memory(
+            base64Decode(cleanBase64.trim()),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.image_outlined,
+              color: AppColors.primary,
+              size: 28,
+            ),
+          );
+        } catch (_) {}
+      } else {
+        return Image.network(
+          report.imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const Icon(
+            Icons.image_outlined,
+            color: AppColors.primary,
+            size: 28,
+          ),
+        );
+      }
+    }
+
+    return const Icon(
+      Icons.image_outlined,
+      color: AppColors.primary,
+      size: 28,
+    );
+  }
+
+  Widget _buildReportCard(BuildContext context, ReportModel report) {
     final textTheme = Theme.of(context).textTheme;
-    final isPositivePoints = report.pointsText?.startsWith('+') ?? false;
+    final isApproved = report.status.toLowerCase() == 'valid' ||
+        report.status.toLowerCase() == 'approved';
+    final pointsText = isApproved ? '+10 pts' : 'Not awarded yet';
 
     return Container(
       width: double.infinity,
@@ -79,21 +128,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
               width: 68,
               height: 68,
               color: AppColors.primaryLight,
-              child: report.imageUrl != null
-                  ? Image.network(
-                      report.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(
-                        Icons.image_outlined,
-                        color: AppColors.primary,
-                        size: 28,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
+              child: _buildReportThumbnail(report),
             ),
           ),
           const SizedBox(width: 12),
@@ -128,7 +163,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
                 // Location
                 Text(
-                  report.location,
+                  '${report.lat.toStringAsFixed(4)}° N, ${report.lng.toStringAsFixed(4)}° E',
                   style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -138,7 +173,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
 
                 // Date
                 Text(
-                  report.dateText,
+                  _formatDate(report.createdAt),
                   style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -151,7 +186,11 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        report.aiNote ?? 'AI: Queued for validation.',
+                        report.aiReason != null && report.aiReason!.isNotEmpty
+                            ? 'AI: ${report.aiReason!}'
+                            : (isApproved
+                                ? 'AI: Verified site.'
+                                : 'AI: Queued for validation.'),
                         style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -162,12 +201,12 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      report.pointsText ?? 'Not awarded yet',
+                      pointsText,
                       style: TextStyle(
                         fontFamily: AppTypography.fontFamily,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isPositivePoints
+                        color: isApproved
                             ? AppColors.primaryDark
                             : AppColors.textSecondary,
                       ),
@@ -218,7 +257,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'No reports match the selected filter.',
+            'No reports match your current filter.',
             style: TextStyle(
               fontFamily: AppTypography.fontFamily,
               fontSize: 13,
@@ -234,7 +273,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final filtered = _filteredReports;
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -287,16 +327,6 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 4),
-
-              // Sub-text
-              Text(
-                '${widget.reports.length} sample reports · Fictional locations',
-                style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Filter Chips
@@ -309,19 +339,39 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
               ),
               const SizedBox(height: 18),
 
-              // Report Cards or Empty State
-              if (filtered.isEmpty)
-                _buildEmptyState(context)
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    return _buildReportCard(context, filtered[index]);
-                  },
-                ),
+              // Stream reports from Firestore
+              StreamBuilder<List<ReportModel>>(
+                stream: uid.isNotEmpty
+                    ? _firestoreService.watchUserReports(uid)
+                    : Stream.value([]),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final allReports = snapshot.data ?? [];
+                  final filtered = _filterReports(allReports);
+
+                  if (filtered.isEmpty) {
+                    return _buildEmptyState(context);
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _buildReportCard(context, filtered[index]);
+                    },
+                  );
+                },
+              ),
               const SizedBox(height: 20),
 
               // Footnote

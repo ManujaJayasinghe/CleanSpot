@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme_proposal.dart';
-import '../../../profile/dummy_data.dart';
+import '../../../../models/coupon_model.dart';
 
 /// A card representing a reward coupon in the shop grid.
-///
-/// Features:
-/// - Mint rounded icon container
-/// - Bold title and two-line description
-/// - Cost in bold green (`{cost} points`)
-/// - Full-width "Redeem" button (disabled with "Not enough points" if insufficient balance)
 class CouponCard extends StatelessWidget {
-  final DummyCoupon coupon;
+  final CouponModel coupon;
   final int userPoints;
   final VoidCallback? onRedeem;
+  final IconData icon;
 
   const CouponCard({
     super.key,
     required this.coupon,
     required this.userPoints,
     this.onRedeem,
+    this.icon = Icons.local_offer_outlined,
   });
 
   bool get canRedeem => userPoints >= coupon.cost;
@@ -47,7 +43,7 @@ class CouponCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              coupon.icon,
+              icon,
               size: 22,
               color: const Color(0xFF1B5E3B),
             ),

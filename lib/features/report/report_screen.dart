@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
 
 import '../../app/theme_proposal.dart';
+import '../../models/report_model.dart';
+import '../../services/firestore_service.dart';
 import '../ai_validation/capture_result.dart';
 import '../ai_validation/capture_service.dart';
 import '../ai_validation/report_check_controller.dart';
@@ -134,7 +140,82 @@ class _ReportScreenState extends State<ReportScreen>
       _currentStep =
           outcome.eligible ? ReportFlowStep.approved : ReportFlowStep.rejected;
     });
+    _saveReportToFirestore(outcome);
     widget.onDecision?.call(outcome);
+  }
+
+  Future<void> _saveReportToFirestore(ReportOutcome outcome) async {
+    final capture = outcome.capture;
+    final jpegBytes = capture.jpegBytes;
+    if (jpegBytes == null) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final uid = user?.uid ?? 'anonymous_user';
+
+      // 1. Compress image to max 800px / 70% JPEG and cap under 300 KB
+      String base64String;
+      try {
+        final decoded = img.decodeImage(jpegBytes);
+        if (decoded == null) {
+          base64String = base64Encode(jpegBytes);
+        } else {
+          int targetDim = 800;
+          img.Image resized = decoded;
+          if (decoded.width > targetDim || decoded.height > targetDim) {
+            if (decoded.width >= decoded.height) {
+              resized = img.copyResize(decoded, width: targetDim);
+            } else {
+              resized = img.copyResize(decoded, height: targetDim);
+            }
+          }
+          int quality = 70;
+          List<int> compressed = img.encodeJpg(resized, quality: quality);
+          const int maxBytes = 300 * 1024;
+          while (compressed.length > maxBytes && quality > 20) {
+            quality -= 15;
+            targetDim = (targetDim * 0.8).toInt();
+            resized = img.copyResize(decoded, width: targetDim);
+            compressed = img.encodeJpg(resized, quality: quality);
+          }
+          base64String = base64Encode(compressed);
+        }
+      } catch (_) {
+        base64String = base64Encode(jpegBytes);
+      }
+
+      final lat = capture.latitude ?? 0.0;
+      final lng = capture.longitude ?? 0.0;
+      final isEligible = outcome.eligible;
+
+      final report = ReportModel(
+        id: '',
+        uid: uid,
+        photoId: '',
+        imageUrl: 'data:image/jpeg;base64,$base64String',
+        lat: lat,
+        lng: lng,
+        type: outcome.validation.category.name.isNotEmpty
+            ? outcome.validation.category.name
+            : 'Other',
+        description: '',
+        status: isEligible ? 'valid' : 'rejected',
+        location: GeoPoint(lat, lng),
+        createdAt: DateTime.now(),
+        lastConfirmedAt: DateTime.now(),
+        aiCategory: outcome.validation.category.name,
+        aiConfidence: outcome.validation.confidence,
+        aiReason: outcome.validation.reason,
+      );
+
+      final firestoreService = FirestoreService();
+      await firestoreService.submitReport(
+        report,
+        photoBase64: base64String,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error saving report to Firestore: $e');
+    }
   }
 
   void _resetToForm() {
@@ -421,62 +502,35 @@ class _ReportScreenState extends State<ReportScreen>
               ),
               const SizedBox(height: 14),
 
-              // Camera and Upload Photo Outlined Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _capturing ? null : _takePhoto,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primaryDark,
-                        side: const BorderSide(color: AppColors.border, width: 1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                      ),
-                      child: _capturing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Camera',
-                              style: TextStyle(
-                                fontFamily: AppTypography.fontFamily,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+              // Take Live Photo Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _capturing ? null : _takePhoto,
+                  icon: _capturing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.camera_alt_outlined, size: 20),
+                  label: Text(
+                    _capture != null ? 'Retake Live Photo' : 'Take Live Photo',
+                    style: const TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      // Verified reports must be live photos.
-                      onPressed: () => _showMessage(
-                        'Please use the camera so your report can be verified',
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primaryDark,
-                        side: const BorderSide(color: AppColors.border, width: 1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                      ),
-                      child: const Text(
-                        'Upload Photo',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryDark,
+                    side: const BorderSide(color: AppColors.border, width: 1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
                   ),
-                ],
+                ),
               ),
             ],
           ),
