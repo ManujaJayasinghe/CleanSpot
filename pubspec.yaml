@@ -33,19 +33,21 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-  firebase_core: ^4.15.0
-  firebase_auth: ^6.7.0
-  cloud_firestore: ^6.10.0
-  firebase_storage: ^13.6.0
+  cupertino_icons: ^2.0.0
+  firebase_core: ^5.1.0
+  firebase_auth: ^7.0.1
+  cloud_firestore: ^7.1.0
+  firebase_storage: ^14.0.1
   go_router: ^18.0.2
   provider: ^6.1.5+1
   google_sign_in: ^7.2.0
-  firebase_ai: ^4.0.0
-  firebase_app_check: ^0.4.8
+  firebase_ai: ^5.1.0
+  firebase_app_check: ^0.5.1
   image_picker: ^1.2.4
   geolocator: ^14.1.2
   image: ^4.3.0
+  google_maps_flutter: ^2.19.0
+  fl_chart: ^1.3.1
 
 dev_dependencies:
   flutter_test:
@@ -73,3 +75,7 @@ flutter:
   # lib/features/ai_validation/README.md). Photos are git-ignored.
   assets:
     - assets/dev_samples/
+    # Dengue statistics for the Analysis screen. Put Anushka's cleaned CSV
+    # at assets/data/dengue_stats.csv (district,year,week,cases); until
+    # then the synthetic dengue_stats_sample.csv is used.
+    - assets/data/
