@@ -38,10 +38,11 @@ class ReportCheckResult {
 class ReportCheckController {
   ReportCheckController({
     Future<ValidationResult> Function(Uint8List jpegBytes)? validate,
-    Future<bool> Function(double latitude, double longitude)? duplicateCheck,
+    Future<String?> Function(double latitude, double longitude)?
+        stillPresentCheck,
     DateTime Function()? now,
   })  : _validate = validate ?? AiValidationService().validatePhoto,
-        _isDuplicate = duplicateCheck ?? duplicates.isDuplicate,
+        _findExisting = stillPresentCheck ?? duplicates.findStillPresentReport,
         _now = now ?? DateTime.now;
 
   static const retryMessage =
@@ -49,7 +50,7 @@ class ReportCheckController {
       'again.';
 
   final Future<ValidationResult> Function(Uint8List) _validate;
-  final Future<bool> Function(double, double) _isDuplicate;
+  final Future<String?> Function(double, double) _findExisting;
   final DateTime Function() _now;
 
   /// Never throws. [onPhase] reports progress.
@@ -77,9 +78,10 @@ class ReportCheckController {
     }
 
     onPhase?.call(CheckPhase.checkingDuplicates);
-    final bool duplicate;
+    final String? existingReportId;
     try {
-      duplicate = await _isDuplicate(capture.latitude!, capture.longitude!);
+      existingReportId =
+          await _findExisting(capture.latitude!, capture.longitude!);
     } catch (e) {
       return ReportCheckResult.failure(
         retryMessage,
@@ -91,8 +93,8 @@ class ReportCheckController {
       ReportOutcome(
         capture: capture,
         validation: validation,
-        isDuplicate: duplicate,
-        decision: decide(validation, capture, duplicate),
+        existingReportId: existingReportId,
+        decision: decide(validation, capture, existingReportId),
         checkedAt: _now(),
       ),
     );

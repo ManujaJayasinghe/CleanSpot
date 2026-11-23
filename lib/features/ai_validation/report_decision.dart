@@ -2,27 +2,59 @@ import 'ai_config.dart';
 import 'capture_result.dart';
 import 'validation_result.dart';
 
-/// Whether a report photo is eligible, and a user-facing reason either way.
-class ReportDecision {
-  const ReportDecision.approved(this.reason) : eligible = true;
-  const ReportDecision.rejected(this.reason) : eligible = false;
+/// What happens to a checked photo.
+enum ReportDecisionKind {
+  /// A new site: saved as a new 'valid' report and points are awarded.
+  approved,
 
-  final bool eligible;
+  /// The photo is fine, but the site is already reported: the existing report
+  /// is marked as still present. No new report, no points.
+  stillPresent,
+
+  /// Not accepted: saved as a 'rejected' report, no points.
+  rejected,
+}
+
+/// The decision for one photo, and a user-facing reason.
+class ReportDecision {
+  const ReportDecision.approved(this.reason)
+      : kind = ReportDecisionKind.approved;
+  const ReportDecision.stillPresent(this.reason)
+      : kind = ReportDecisionKind.stillPresent;
+  const ReportDecision.rejected(this.reason)
+      : kind = ReportDecisionKind.rejected;
+
+  final ReportDecisionKind kind;
 
   /// Short text that can be shown to the user as-is.
   final String reason;
+
+  /// A new valid report that earns points.
+  bool get eligible => kind == ReportDecisionKind.approved;
+
+  bool get isStillPresent => kind == ReportDecisionKind.stillPresent;
 }
 
-/// Pure decision rule. A report is eligible only if ALL of these hold:
-/// the AI check succeeded, the GPS fix is good (within 50 m), the photo does
-/// not look fake, the AI says it is a breeding site with confidence of at least
-/// [kMinConfidence], and it is not a duplicate of a recent nearby report.
+/// Shown when a photo is accepted but the site is already reported.
+const String kStillPresentMessage =
+    "Thanks, this site is already reported. We've marked it as still present.";
+
+/// Pure decision rule.
+///
+/// A photo passes only if ALL of these hold: the AI check succeeded, the GPS
+/// fix is good (within 50 m), the photo does not look fake, and the AI says it
+/// is a breeding site with confidence of at least [kMinConfidence]. Otherwise
+/// it is rejected.
+///
+/// A passing photo is [ReportDecisionKind.stillPresent] when
+/// [existingReportId] is set (a valid report already covers this spot; see
+/// `findStillPresentReport`), and [ReportDecisionKind.approved] otherwise.
 ///
 /// An error result from the AI is never eligible.
 ReportDecision decide(
   ValidationResult ai,
   CaptureResult capture,
-  bool isDuplicate,
+  String? existingReportId,
 ) {
   if (ai.isError) {
     return const ReportDecision.rejected(ValidationResult.retryMessage);
@@ -49,11 +81,8 @@ ReportDecision decide(
       'photo of the standing water.',
     );
   }
-  if (isDuplicate) {
-    return const ReportDecision.rejected(
-      'A report for this spot was already submitted recently. Please choose a '
-      'different site.',
-    );
+  if (existingReportId != null) {
+    return const ReportDecision.stillPresent(kStillPresentMessage);
   }
   return ReportDecision.approved(ai.reason);
 }

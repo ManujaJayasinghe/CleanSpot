@@ -63,10 +63,11 @@ Stores reports of potential mosquito-breeding sites submitted by community membe
 | `lat` | `double` | Latitude coordinate. |
 | `lng` | `double` | Longitude coordinate. |
 | `geohash` | `string` | Geohash string computed from location for proximity queries. |
-| `status` | `string` | `'valid'` (AI approved, automatic) or `'rejected'` (AI did not approve). `'pending'` is not used by the AI flow. Only `'valid'` reports count for the map and the duplicate check. |
-| `confirmationCount` | `int` | Number of community/admin confirmations for duplicate reporting. |
+| `status` | `string` | `'valid'` (AI approved, automatic) or `'rejected'` (AI did not approve). `'pending'` is not used by the AI flow. Only `'valid'` reports count for the map and the still-present check. |
+| `confirmationCount` | `int` | Number of "still present" confirmations: a passing photo from any user within 50 m and 14 days of this report adds one instead of creating a new report. |
 | `createdAt` | `timestamp` | Timestamp when the report was submitted. |
-| `lastConfirmedAt` | `timestamp` | Timestamp when the report was last confirmed/verified. |
+| `lastConfirmedAt` | `timestamp` | Server time of the last "still present" confirmation (the creation time until then). |
+| `lastConfirmationId` | `string` (optional) | Id of the last "still present" confirmation, so a retried confirmation is not counted twice. Absent until the first confirmation. |
 | `aiCategory` | `string` (optional) | Site type found by the AI photo check, as a wire value: `'stagnant_water'`, `'tire'`, `'blocked_drain'`, `'container'`, `'other'` or `'none'`. Absent on older reports. |
 | `aiConfidence` | `number` (optional) | AI confidence that the photo shows a breeding site, from 0 to 1. Absent on older reports. |
 | `aiReason` | `string` (optional) | Short user-friendly explanation from the AI check. Absent on older reports. |
