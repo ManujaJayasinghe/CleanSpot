@@ -101,6 +101,32 @@ class FirestoreService {
     return reportRef.id;
   }
 
+  /// Marks an existing report as still present (the "still present" rule):
+  /// adds one to `confirmationCount` and sets `lastConfirmedAt` to server time.
+  /// Nothing else is written: no new report, no photo and no points.
+  ///
+  /// [confirmationId] identifies this one confirmation (create it once per
+  /// outcome, like a report id). Runs in a transaction that reads the report
+  /// from the server first: if it already carries this [confirmationId] (an
+  /// earlier attempt succeeded but its reply was lost), nothing is written, so
+  /// a retry never counts twice. Throws on any failure, including offline and
+  /// a report that no longer exists.
+  Future<void> markReportStillPresent(
+    String reportId, {
+    required String confirmationId,
+  }) async {
+    final reportRef = _reportsRef.doc(reportId);
+    final update = buildStillPresentUpdate(confirmationId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(reportRef);
+      if (!snap.exists) {
+        throw StateError('Report $reportId no longer exists.');
+      }
+      if (snap.data()?['lastConfirmationId'] == confirmationId) return;
+      tx.update(reportRef, update);
+    });
+  }
+
   // Photos already loaded this session, and loads in progress, shared by every
   // FirestoreService instance.
   static final Map<String, Uint8List> _photoCache = {};

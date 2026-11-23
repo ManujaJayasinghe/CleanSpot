@@ -90,18 +90,18 @@ void main() {
       expect(n.every((h) => h.length == 6), isTrue);
     });
 
-    test('every point within 20 m lands in the cell or a neighbour', () {
+    test('every point within 50 m lands in the cell or a neighbour', () {
       final rnd = math.Random(42);
       for (var i = 0; i < 2000; i++) {
         final lat = -60 + rnd.nextDouble() * 120;
         final lng = -180 + rnd.nextDouble() * 360;
         final cell = geohash.encode(lat, lng, 6);
         final covered = {cell, ...geohash.neighbours(cell)};
-        // Offset by up to ~20 m in a random direction.
+        // Offset by up to ~50 m in a random direction.
         final angle = rnd.nextDouble() * 2 * math.pi;
-        final dLat = 20 / 111195 * math.sin(angle);
+        final dLat = 50 / 111195 * math.sin(angle);
         final dLng =
-            20 / (111195 * math.cos(lat * math.pi / 180)) * math.cos(angle);
+            50 / (111195 * math.cos(lat * math.pi / 180)) * math.cos(angle);
         var lng2 = lng + dLng;
         if (lng2 > 180) lng2 -= 360;
         if (lng2 < -180) lng2 += 360;

@@ -93,3 +93,18 @@ ReportWritePlan buildReportWritePlan(
       );
   }
 }
+
+/// The update written to an existing `reports/{id}` when a new photo marks the
+/// site as still present: one more confirmation, a server-time
+/// `lastConfirmedAt`, and [confirmationId] so a retry of the same confirmation
+/// can be recognised and skipped. No new report, no photo, no points.
+Map<String, dynamic> buildStillPresentUpdate(String confirmationId) {
+  if (confirmationId.isEmpty) {
+    throw ArgumentError('A still-present update needs a confirmation id.');
+  }
+  return {
+    'confirmationCount': FieldValue.increment(1),
+    'lastConfirmedAt': FieldValue.serverTimestamp(),
+    'lastConfirmationId': confirmationId,
+  };
+}
