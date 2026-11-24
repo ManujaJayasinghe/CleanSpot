@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../models/user_model.dart';
-import 'router.dart';
-
 const _tabs = [
   (path: '/home', label: 'Map', icon: Icons.map_outlined),
   (path: '/report', label: 'Report', icon: Icons.add_circle_outline),
@@ -54,33 +51,6 @@ class HomeShell extends StatelessWidget {
                     context.go(t.path);
                   },
                 ),
-              ListenableBuilder(
-                listenable: session,
-                builder: (context, _) {
-                  if (session.role != kRoleAdmin) return const SizedBox.shrink();
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Divider(),
-                      ListTile(
-                        leading: const Icon(Icons.admin_panel_settings, color: Color(0xFF7B1FA2)),
-                        title: const Text(
-                          'Admin Dashboard',
-                          style: TextStyle(
-                            color: Color(0xFF7B1FA2),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        selected: location.startsWith('/admin'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.push('/admin');
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
             ],
           ),
         ),

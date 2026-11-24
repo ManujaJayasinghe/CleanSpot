@@ -93,11 +93,8 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     final textTheme = Theme.of(context).textTheme;
     final isApproved = report.status.toLowerCase() == 'valid' ||
         report.status.toLowerCase() == 'approved';
-    // A cleared report was valid first, so its points were already awarded.
-    final pointsText = (isApproved ||
-            report.status.toLowerCase() == reportStatusCleared)
-        ? '+$kPointsPerValidReport pts'
-        : 'Not awarded yet';
+    final pointsText =
+        isApproved ? '+$kPointsPerValidReport pts' : 'Not awarded yet';
 
     return Container(
       width: double.infinity,

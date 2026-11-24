@@ -2,190 +2,48 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------------------------------------------
-    // Helpers. The caller's role and blocked flag come from their own
-    // users/{uid} document, so they cannot be faked from the app: the rules
-    // below stop anyone but an admin changing them.
-    // ------------------------------------------------------------------
-    function isSignedIn() {
+    // Helper functions
+    function isAuthenticated() {
       return request.auth != null;
     }
-
+    
     function isOwner(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+      return isAuthenticated() && request.auth.uid == uid;
     }
 
-    function callerPath() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
-    }
-
-    // No users document yet (first sign-in) means a normal, unblocked user.
-    function callerExists() {
-      return isSignedIn() && exists(callerPath());
-    }
-
-    function callerRole() {
-      return callerExists() ? get(callerPath()).data.get('role', 'user') : 'user';
-    }
-
-    function isBlocked() {
-      return callerExists() && get(callerPath()).data.get('blocked', false) == true;
-    }
-
-    // Signed in and not blocked.
-    function isActive() {
-      return isSignedIn() && !isBlocked();
-    }
-
-    function isAdmin() {
-      return isActive() && callerRole() == 'admin';
-    }
-
-    // Authority or admin.
-    function isStaff() {
-      return isActive() && (callerRole() == 'authority' || callerRole() == 'admin');
-    }
-
-    // ------------------------------------------------------------------
-    // users
-    // ------------------------------------------------------------------
-
-    // The ONLY ways a user's own points may change:
-    //  - unchanged
-    //  - +10 on both fields: the batch that saves a valid report
-    //    (kPointsPerValidReport in lib/services/report_write_plan.dart)
-    //  - both set to the same lower, non-negative value: redeeming a coupon
-    function pointsChangeAllowed(before, after) {
-      let dPoints = after.get('points', 0) - before.get('points', 0);
-      let dBalance = after.get('pointsBalance', 0) - before.get('pointsBalance', 0);
-      let current = before.get('points', before.get('pointsBalance', 0));
-      return (dPoints == 0 && dBalance == 0)
-          || (dPoints == 10 && dBalance == 10)
-          || (after.get('points', 0) == after.get('pointsBalance', 0)
-              && after.get('points', 0) >= 0
-              && after.get('points', 0) < current);
-    }
-
-    function ownerMayUpdate() {
-      return resource.data.get('blocked', false) == false
-          && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['role', 'blocked'])
-          && pointsChangeAllowed(resource.data, request.resource.data);
-    }
-
-    // An admin may change only role and blocked, and only to valid values.
-    function adminMayUpdate() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['role', 'blocked'])
-          && request.resource.data.get('role', 'user') in ['user', 'admin', 'authority']
-          && request.resource.data.get('blocked', false) in [true, false];
-    }
-
+    // 1. users: Users can read profiles, but only modify their own profile
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-
-      // You can create your own document, but only as a normal unblocked user
-      // with no points.
-      allow create: if isOwner(uid)
-          && request.resource.data.get('role', 'user') == 'user'
-          && request.resource.data.get('blocked', false) == false
-          && request.resource.data.get('points', 0) == 0
-          && request.resource.data.get('pointsBalance', 0) == 0;
-
-      allow update: if (isOwner(uid) && ownerMayUpdate())
-          || (isAdmin() && adminMayUpdate());
-
-      allow delete: if false;
+      allow read: if isAuthenticated();
+      allow write: if isOwner(uid);
     }
 
-    // ------------------------------------------------------------------
-    // reports
-    // ------------------------------------------------------------------
-
-    // Authority or admin marking a valid report as cleared.
-    function isClearing() {
-      let before = resource.data;
-      let after = request.resource.data;
-      return before.status == 'valid'
-          && after.status == 'cleared'
-          && after.diff(before).affectedKeys().hasOnly(['status', 'clearedBy', 'clearedAt'])
-          && after.clearedBy == request.auth.uid
-          && after.clearedAt == request.time;
-    }
-
-    // Someone's new photo of an already reported site: +1 confirmation and the
-    // time, nothing else (FirestoreService.markReportStillPresent).
-    function isStillPresent() {
-      let before = resource.data;
-      let after = request.resource.data;
-      return before.status == 'valid'
-          && after.diff(before).affectedKeys()
-              .hasOnly(['confirmationCount', 'lastConfirmedAt', 'lastConfirmationId'])
-          && after.get('confirmationCount', 0) == before.get('confirmationCount', 0) + 1
-          && after.lastConfirmedAt == request.time;
-    }
-
+    // 2. reports: Public read for verified reports, submitters can create
     match /reports/{reportId} {
-      allow read: if isSignedIn();
-
-      // Your own report, saved as valid or rejected.
-      allow create: if isActive()
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.status in ['valid', 'rejected'];
-
-      // Only authority/admin can clear; anyone active can add a still-present
-      // confirmation; nothing else can change a report.
-      allow update: if (isStaff() && isClearing())
-          || (isActive() && isStillPresent());
-
-      allow delete: if false;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      // Allow updates for confirmations or status changes
+      allow update: if isAuthenticated();
     }
 
-    // ------------------------------------------------------------------
-    // reportPhotos: read one by id only; never list.
-    // ------------------------------------------------------------------
+    // 3. reportPhotos: Isolated image storage for reports (under 300KB)
+    // List/querying is prevented; only single document read by ID is permitted
     match /reportPhotos/{reportId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-
-      // Only the owner of the report this photo belongs to. getAfter sees the
-      // report even when it is created in the same batch as the photo.
-      allow create: if isActive()
-          && getAfter(/databases/$(database)/documents/reports/$(reportId)).data.uid
-              == request.auth.uid;
-
-      allow update: if false;
-
-      // Removed when an authority/admin clears the report.
-      allow delete: if isStaff();
+      allow get: if isAuthenticated();
+      allow list: if false; // Strict prohibition on bulk queries
+      allow create: if isAuthenticated();
     }
 
-    // ------------------------------------------------------------------
-    // coupons
-    // ------------------------------------------------------------------
-
-    // Redeeming: an available coupon becomes unavailable, nothing else changes
-    // (FirestoreService.redeemCoupon).
-    function isRedeeming() {
-      let before = resource.data;
-      let after = request.resource.data;
-      return before.get('available', true) == true
-          && after.available == false
-          && after.diff(before).affectedKeys().hasOnly(['available', 'status']);
-    }
-
+    // 4. coupons: Read available coupons, updates handled atomically during redemption
     match /coupons/{couponId} {
-      allow read: if isSignedIn();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (isActive() && isRedeeming());
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
 
-    // ------------------------------------------------------------------
-    // redemptions: your own only.
-    // ------------------------------------------------------------------
+    // 5. redemptions: Users can create and read their own redemptions
     match /redemptions/{redemptionId} {
-      allow read: if isSignedIn() && (resource == null || resource.data.uid == request.auth.uid);
-      allow create: if isActive() && request.resource.data.uid == request.auth.uid;
+      allow read: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
     }
   }
 }
+

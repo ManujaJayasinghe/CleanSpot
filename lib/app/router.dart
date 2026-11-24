@@ -1,8 +1,10 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/admin/admin_home_screen.dart';
 import '../features/analysis/analysis_screen.dart';
-import '../features/authority/authority_home_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/home/home_screen.dart';
@@ -14,32 +16,38 @@ import '../features/report/report_screen.dart';
 import '../features/rewards/rewards_screen.dart';
 import '../features/symptoms/symptoms_screen.dart';
 import 'home_shell.dart';
-import 'session.dart';
-import 'splash_screen.dart';
 
-/// Who is signed in and their role (read live from Firestore). The router
-/// re-runs its redirect whenever this changes.
-final SessionNotifier session = SessionNotifier();
+/// Re-runs the router redirect whenever the auth state changes.
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh() {
+    _sub = FirebaseAuth.instance.authStateChanges().listen(
+          (_) => notifyListeners(),
+        );
+  }
+
+  late final StreamSubscription<User?> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
 
 final router = GoRouter(
   initialLocation: '/home',
-  refreshListenable: session,
-  // See redirectFor() in session.dart: login sends each role to its home, and
-  // /admin and /authority are closed to everyone else.
-  redirect: (context, state) => session.redirect(state.matchedLocation),
+  refreshListenable: _AuthRefresh(),
+  redirect: (context, state) {
+    final signedIn = FirebaseAuth.instance.currentUser != null;
+    final atAuth = state.matchedLocation == '/login' ||
+        state.matchedLocation == '/register';
+    if (!signedIn) return atAuth ? null : '/login';
+    if (atAuth) return '/home';
+    return null;
+  },
   routes: [
-    GoRoute(
-      path: '/login',
-      builder: (_, state) =>
-          LoginScreen(blocked: state.uri.queryParameters['blocked'] == '1'),
-    ),
+    GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
-    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
-    GoRoute(path: '/admin', builder: (_, _) => const AdminHomeScreen()),
-    GoRoute(
-      path: '/authority',
-      builder: (_, _) => const AuthorityHomeScreen(),
-    ),
     ShellRoute(
       builder: (_, _, child) => HomeShell(child: child),
       routes: [

@@ -16,7 +16,6 @@ Map<String, dynamic> baseDoc() => {
 
 void main() {
   _extraTests();
-  clearedTests();
   group('ReportModel AI fields', () {
     test('old documents without AI fields still parse (fields are null)', () {
       final r = ReportModel.fromMap('r1', baseDoc());
@@ -199,52 +198,6 @@ void _extraTests() {
       expect(SiteCategory.labelFor(null), 'Other');
       expect(SiteCategory.labelFor(''), 'Other');
       expect(SiteCategory.labelFor('unknown thing'), 'unknown thing');
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// 'cleared' reports: who cleared them and when.
-// ---------------------------------------------------------------------------
-void clearedTests() {
-  group('ReportModel cleared fields', () {
-    test('old documents have no clearedBy or clearedAt', () {
-      final r = ReportModel.fromMap('r1', baseDoc());
-      expect(r.clearedBy, isNull);
-      expect(r.clearedAt, isNull);
-    });
-
-    test('a cleared document is read with who and when', () {
-      final r = ReportModel.fromMap(
-        'r1',
-        baseDoc()
-          ..['status'] = 'cleared'
-          ..['clearedBy'] = 'officer1'
-          ..['clearedAt'] = Timestamp.fromDate(DateTime(2026, 11, 25, 9)),
-      );
-      expect(r.status, 'cleared');
-      expect(r.clearedBy, 'officer1');
-      expect(r.clearedAt, DateTime(2026, 11, 25, 9));
-    });
-
-    test('toMap omits the cleared fields unless set', () {
-      final plain = ReportModel.fromMap('r1', baseDoc()).toMap();
-      expect(plain.containsKey('clearedBy'), isFalse);
-      expect(plain.containsKey('clearedAt'), isFalse);
-    });
-
-    test('cleared fields round trip', () {
-      final original = ReportModel.fromMap(
-        'r1',
-        baseDoc()
-          ..['status'] = 'cleared'
-          ..['clearedBy'] = 'officer1'
-          ..['clearedAt'] = Timestamp.fromDate(DateTime(2026, 11, 25, 9)),
-      );
-      final copy = ReportModel.fromMap('r1', original.toMap());
-      expect(copy.clearedBy, 'officer1');
-      expect(copy.clearedAt, DateTime(2026, 11, 25, 9));
-      expect(copy.status, 'cleared');
     });
   });
 }

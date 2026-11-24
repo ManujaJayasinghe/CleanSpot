@@ -15,26 +15,22 @@ import '../ai_validation/capture_result.dart';
 import '../ai_validation/capture_service.dart';
 import '../ai_validation/geohash.dart' as geohash;
 import '../ai_validation/report_check_controller.dart';
-import '../ai_validation/report_decision.dart' show kStillPresentMessage;
 import '../ai_validation/report_outcome.dart';
 
 /// Shows the "UI FLOW" stage bar and the Simulate Approved/Rejected buttons.
 /// Off by default; enable with: flutter run --dart-define=DEMO_CONTROLS=true
 const bool _demoControls = bool.fromEnvironment('DEMO_CONTROLS');
 
-/// The step states of the AI report verification workflow:
-/// 1. [form]         - Image 1: "Report a Breeding Site"
-/// 2. [checking]     - Image 2: "AI is Checking Your Report"
-/// 3. [approved]     - Image 3: "Report Verified Successfully"
-/// 4. [rejected]     - Image 4: "Report Not Approved"
-/// 5. [stillPresent] - the site is already reported; it was marked as still
-///    present instead of creating a new report (no points)
+/// The 4 step states of the AI report verification workflow:
+/// 1. [form]      - Image 1: "Report a Breeding Site"
+/// 2. [checking]  - Image 2: "AI is Checking Your Report"
+/// 3. [approved]  - Image 3: "Report Verified Successfully"
+/// 4. [rejected]  - Image 4: "Report Not Approved"
 enum ReportFlowStep {
   form,
   checking,
   approved,
   rejected,
-  stillPresent,
 }
 
 /// Progress of saving the checked report to Firestore.
@@ -43,9 +39,8 @@ enum _SaveStatus { idle, saving, saved, failed }
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key, this.onDecision});
 
-  /// Called once when the AI check ends in a final decision (approved, still
-  /// present or rejected). The screen saves the result itself; do not save it
-  /// again from here.
+  /// Hook for report submission / points: called once when the AI check ends
+  /// in a final approved or rejected decision. Nothing is saved by this screen.
   /// Not called when the check itself fails (the user gets a retry instead).
   final ReportDecisionCallback? onDecision;
 
@@ -148,11 +143,8 @@ class _ReportScreenState extends State<ReportScreen>
     final outcome = result.outcome!;
     setState(() {
       _outcome = outcome;
-      _currentStep = outcome.eligible
-          ? ReportFlowStep.approved
-          : outcome.isStillPresent
-              ? ReportFlowStep.stillPresent
-              : ReportFlowStep.rejected;
+      _currentStep =
+          outcome.eligible ? ReportFlowStep.approved : ReportFlowStep.rejected;
     });
     _beginSave(outcome);
     widget.onDecision?.call(outcome);
@@ -211,22 +203,6 @@ class _ReportScreenState extends State<ReportScreen>
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw StateError('Not signed in');
-
-      final existingReportId = outcome.existingReportId;
-      if (outcome.isStillPresent && existingReportId != null) {
-        // Already reported: update that report only. No new report, no photo,
-        // no points. _reportId is reused as this confirmation's id, so Retry
-        // cannot count the confirmation twice.
-        final service = FirestoreService();
-        await service.markReportStillPresent(
-          existingReportId,
-          confirmationId: _reportId ??= service.newReportId(),
-        );
-        if (!mounted || token != _saveToken) return;
-        setState(() => _saveStatus = _SaveStatus.saved);
-        return;
-      }
-
       final capture = outcome.capture;
       final lat = capture.latitude!;
       final lng = capture.longitude!;
@@ -358,8 +334,6 @@ class _ReportScreenState extends State<ReportScreen>
         return _buildApprovedStep(context);
       case ReportFlowStep.rejected:
         return _buildRejectedStep(context);
-      case ReportFlowStep.stillPresent:
-        return _buildStillPresentStep(context);
     }
   }
 
@@ -1058,7 +1032,7 @@ class _ReportScreenState extends State<ReportScreen>
                   icon: validating ? Icons.access_time : Icons.crop_free,
                   iconColor:
                       validating ? AppColors.textSecondary : AppColors.primaryDark,
-                  text: 'Checking if this site is already reported',
+                  text: 'Checking for duplicate reports',
                   textColor:
                       validating ? AppColors.textSecondary : AppColors.textPrimary,
                   busy: !validating,
@@ -1572,7 +1546,7 @@ class _ReportScreenState extends State<ReportScreen>
 
               Text(
                 _outcome?.decision.reason ??
-                    'This photo does not clearly show standing water. No points were awarded.',
+                    'Duplicate report. This photo and location match a site already submitted. No new points were awarded.',
                 style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
                   color: AppColors.textSecondary,
                   fontSize: 14,
@@ -1684,7 +1658,7 @@ class _ReportScreenState extends State<ReportScreen>
               const SizedBox(height: 14),
               _buildTipItem(
                 icon: Icons.fact_check_outlined,
-                text: 'Photograph the site itself, not a screen or printout.',
+                text: 'Choose a different, unreported site.',
               ),
               const SizedBox(height: 12),
               _buildTipItem(
@@ -1713,237 +1687,6 @@ class _ReportScreenState extends State<ReportScreen>
             style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
               fontSize: 12,
               color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // STEP 5: Already reported, marked as still present
-  // ---------------------------------------------------------------------------
-  Widget _buildStillPresentStep(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final failed = _saveStatus == _SaveStatus.failed;
-    final saving =
-        _saveStatus == _SaveStatus.saving || _saveStatus == _SaveStatus.idle;
-    final color = failed ? AppColors.errorText : AppColors.primaryDark;
-
-    final String bannerTitle;
-    final String bannerSubtitle;
-    if (failed) {
-      bannerTitle = "Couldn't update the report";
-      bannerSubtitle = 'Check your connection and try again.';
-    } else if (saving) {
-      bannerTitle = 'Updating the existing report…';
-      bannerSubtitle = 'This only takes a moment.';
-    } else {
-      bannerTitle = 'Marked as still present';
-      bannerSubtitle = 'No new report was created, so no points were added.';
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        const Text(
-          'REPORT RESULT · ALREADY REPORTED',
-          style: TextStyle(
-            fontFamily: AppTypography.fontFamily,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primaryDark,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: 56,
-          height: 56,
-          decoration: const BoxDecoration(
-            color: AppColors.primaryLight,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.update,
-            color: AppColors.primaryDark,
-            size: 30,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'Site Already\nReported',
-          style: (textTheme.headlineSmall ?? AppTypography.title).copyWith(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _outcome?.decision.reason ?? kStillPresentMessage,
-          style: (textTheme.bodyMedium ?? AppTypography.body).copyWith(
-            color: AppColors.textSecondary,
-            fontSize: 14,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 18),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border, width: 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
-                child: _buildPhotoImage(170),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  _captureCaption(),
-                  style: (textTheme.bodySmall ?? AppTypography.caption)
-                      .copyWith(fontSize: 13, color: AppColors.textSecondary),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: failed ? AppColors.errorBg : AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
-          ),
-          child: Row(
-            children: [
-              saving
-                  ? SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: color,
-                      ),
-                    )
-                  : Icon(
-                      failed ? Icons.error_outline : Icons.check_circle_outline,
-                      color: color,
-                      size: 26,
-                    ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bannerTitle,
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamily,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      bannerSubtitle,
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamily,
-                        fontSize: 13,
-                        color: color.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (failed) ...[
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _retrySave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(
-                  fontFamily: AppTypography.fontFamily,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ] else ...[
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: saving ? null : () => context.go('/map'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'View on Map',
-                style: TextStyle(
-                  fontFamily: AppTypography.fontFamily,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton(
-            onPressed: saving ? null : _resetToForm,
-            style: OutlinedButton.styleFrom(
-              backgroundColor: AppColors.surface,
-              foregroundColor: AppColors.primaryDark,
-              side: const BorderSide(color: AppColors.border),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            child: Text(
-              failed ? 'Retake photo' : 'Report a Different Site',
-              style: const TextStyle(
-                fontFamily: AppTypography.fontFamily,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ),

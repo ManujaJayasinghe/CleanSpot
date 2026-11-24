@@ -14,8 +14,6 @@ enum StatusChipType {
   /// Helper parser for dynamic or backend status strings
   static StatusChipType fromString(String value) {
     final lower = value.toLowerCase();
-    // A cleared site was dealt with by an authority: shown as reviewed.
-    if (lower == 'cleared') return StatusChipType.reviewed;
     if (lower == 'valid' || lower.contains('valid') || lower.contains('approved')) {
       return StatusChipType.valid;
     }

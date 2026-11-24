@@ -52,14 +52,3 @@ app.*.map.json
 # AI live-test sample photos stay local; only the folder placeholder is tracked
 assets/dev_samples/*
 !assets/dev_samples/.gitkeep
-
-# Firestore rules tests: dependencies are installed locally
-firestore-rules-test/node_modules/
-firestore-rules-test/npm_install.log
-firestore-rules-test/firebase-debug.log
-firestore-debug.log
-firebase-debug.log
-firestore-rules-test/rules_test_run.log
-
-# Downloaded Weekly Epidemiological Report PDFs (re-create with tool/download_wer.py)
-tool/wer_pdfs/

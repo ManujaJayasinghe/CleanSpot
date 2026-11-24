@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../app/router.dart';
 import '../../app/theme_proposal.dart';
-import '../../models/user_model.dart';
 import 'current_user.dart';
 import 'widgets/widgets.dart';
 
@@ -156,28 +154,6 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               // Navigation Tiles
-              ListenableBuilder(
-                listenable: session,
-                builder: (context, _) {
-                  if (session.role != kRoleAdmin) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF3E5F5),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCE93D8)),
-                      ),
-                      child: MenuTile(
-                        icon: Icons.admin_panel_settings,
-                        title: 'Admin Dashboard',
-                        subtitle: 'Manage users, roles, reports & coupons',
-                        onTap: () => context.push('/admin'),
-                      ),
-                    ),
-                  );
-                },
-              ),
               MenuTile(
                 icon: Icons.assignment_outlined,
                 title: 'My Reports',

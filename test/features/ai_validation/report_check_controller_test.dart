@@ -34,9 +34,9 @@ void main() {
         validated = bytes;
         return siteResult;
       },
-      stillPresentCheck: (lat, lng) async {
+      duplicateCheck: (lat, lng) async {
         dupLat = lat;
-        return null;
+        return false;
       },
       now: () => fixedTime,
     );
@@ -49,25 +49,22 @@ void main() {
     expect(dupLat, 7.2906);
     final outcome = result.outcome!;
     expect(outcome.eligible, isTrue);
-    expect(outcome.isStillPresent, isFalse);
-    expect(outcome.existingReportId, isNull);
+    expect(outcome.isDuplicate, isFalse);
     expect(outcome.validation.category, SiteCategory.stagnantWater);
     expect(outcome.decision.reason, 'Standing water in a pot.');
     expect(outcome.checkedAt, fixedTime);
     expect(outcome.capture.latitude, 7.2906);
   });
 
-  test('an already reported site is a still-present outcome', () async {
+  test('a duplicate is a rejected outcome, not a failure', () async {
     final controller = ReportCheckController(
       validate: (_) async => siteResult,
-      stillPresentCheck: (_, _) async => 'existing-1',
+      duplicateCheck: (_, _) async => true,
     );
     final result = await controller.check(goodCapture());
     expect(result.isSuccess, isTrue);
-    final outcome = result.outcome!;
-    expect(outcome.eligible, isFalse, reason: 'no new report, no points');
-    expect(outcome.isStillPresent, isTrue);
-    expect(outcome.existingReportId, 'existing-1');
+    expect(result.outcome!.eligible, isFalse);
+    expect(result.outcome!.isDuplicate, isTrue);
   });
 
   test('an AI rejection is a rejected outcome with the AI reason', () async {
@@ -79,7 +76,7 @@ void main() {
         looksFake: false,
         reason: 'This is an indoor room.',
       ),
-      stillPresentCheck: (_, _) async => null,
+      duplicateCheck: (_, _) async => false,
     );
     final result = await controller.check(goodCapture());
     expect(result.isSuccess, isTrue);
@@ -92,9 +89,9 @@ void main() {
       var dupCalled = false;
       final controller = ReportCheckController(
         validate: (_) async => const ValidationResult.error('quota exceeded'),
-        stillPresentCheck: (_, _) async {
+        duplicateCheck: (_, _) async {
           dupCalled = true;
-          return null;
+          return false;
         },
       );
       final result = await controller.check(goodCapture());
@@ -108,7 +105,7 @@ void main() {
     test('validate throws', () async {
       final controller = ReportCheckController(
         validate: (_) async => throw Exception('boom'),
-        stillPresentCheck: (_, _) async => null,
+        duplicateCheck: (_, _) async => false,
       );
       final result = await controller.check(goodCapture());
       expect(result.isSuccess, isFalse);
@@ -119,7 +116,7 @@ void main() {
     test('duplicate check throws', () async {
       final controller = ReportCheckController(
         validate: (_) async => siteResult,
-        stillPresentCheck: (_, _) async => throw Exception('firestore down'),
+        duplicateCheck: (_, _) async => throw Exception('firestore down'),
       );
       final result = await controller.check(goodCapture());
       expect(result.isSuccess, isFalse);
@@ -134,7 +131,7 @@ void main() {
           called = true;
           return siteResult;
         },
-        stillPresentCheck: (_, _) async => null,
+        duplicateCheck: (_, _) async => false,
       );
       final result = await controller.check(
         const CaptureResult.failure(CaptureFailure.cancelled, 'none'),

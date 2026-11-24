@@ -1,15 +1,1 @@
-{
-  "firestore": {
-    "rules": "firestore.rules"
-  },
-  "emulators": {
-    "firestore": {
-      "port": 8080
-    },
-    "ui": {
-      "enabled": false
-    },
-    "singleProjectMode": true
-  },
-  "flutter": {"platforms":{"android":{"default":{"projectId":"clearspot-640fb","appId":"1:502186374219:android:3c77680ea4fb9580bf09ce","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"clearspot-640fb","configurations":{"android":"1:502186374219:android:3c77680ea4fb9580bf09ce","ios":"1:502186374219:ios:bc786cc1c775246dbf09ce","macos":"1:502186374219:ios:bc786cc1c775246dbf09ce","web":"1:502186374219:web:087e9ec5b59d51b5bf09ce","windows":"1:502186374219:web:2e6cdbf398ab5624bf09ce"}}}}}
-}
+{"flutter":{"platforms":{"android":{"default":{"projectId":"clearspot-640fb","appId":"1:502186374219:android:3c77680ea4fb9580bf09ce","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"clearspot-640fb","configurations":{"android":"1:502186374219:android:3c77680ea4fb9580bf09ce","ios":"1:502186374219:ios:bc786cc1c775246dbf09ce","macos":"1:502186374219:ios:bc786cc1c775246dbf09ce","web":"1:502186374219:web:087e9ec5b59d51b5bf09ce","windows":"1:502186374219:web:2e6cdbf398ab5624bf09ce"}}}}}}
