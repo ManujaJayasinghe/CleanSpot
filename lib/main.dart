@@ -50,6 +50,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'CleanSpot',
+      debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routerConfig: router,
     );
