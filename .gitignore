@@ -60,3 +60,6 @@ firestore-rules-test/firebase-debug.log
 firestore-debug.log
 firebase-debug.log
 firestore-rules-test/rules_test_run.log
+
+# Downloaded Weekly Epidemiological Report PDFs (re-create with tool/download_wer.py)
+tool/wer_pdfs/
