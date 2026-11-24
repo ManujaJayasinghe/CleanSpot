@@ -5,6 +5,8 @@ class CouponModel {
   final int cost;
   final String code;
   final bool available;
+  final int stock;
+  final List<String> codes;
 
   const CouponModel({
     required this.id,
@@ -13,6 +15,8 @@ class CouponModel {
     required this.cost,
     required this.code,
     required this.available,
+    this.stock = 1,
+    this.codes = const [],
   });
 
   factory CouponModel.fromMap(String id, Map<String, dynamic> map) {
@@ -23,14 +27,29 @@ class CouponModel {
         : (map['status'] == 'available' || map['available'] == null);
     final descVal = map['description'] as String? ?? map['value'] as String? ?? '';
     final titleVal = map['title'] as String? ?? (descVal.isNotEmpty ? descVal : 'Coupon');
+    final codeVal = map['code'] as String? ?? '';
+
+    // Handle pool of codes or fallback to single code
+    final rawCodes = map['codes'];
+    List<String> codesList = [];
+    if (rawCodes is List) {
+      codesList = rawCodes.map((e) => e.toString()).toList();
+    } else if (codeVal.isNotEmpty) {
+      codesList = [codeVal];
+    }
+
+    final stockVal = (map['stock'] as num?)?.toInt() ??
+        (codesList.isNotEmpty ? codesList.length : (availableVal ? 1 : 0));
 
     return CouponModel(
       id: id,
       title: titleVal,
       description: descVal,
       cost: costVal,
-      code: map['code'] as String? ?? '',
-      available: availableVal,
+      code: codeVal.isNotEmpty ? codeVal : (codesList.isNotEmpty ? codesList.first : ''),
+      available: availableVal && stockVal > 0,
+      stock: stockVal,
+      codes: codesList,
     );
   }
 
@@ -40,16 +59,19 @@ class CouponModel {
       'description': description,
       'cost': cost,
       'code': code,
-      'available': available,
-      // Retain backwards compatibility fields if needed by any teammate
+      'available': available && stock > 0,
+      'stock': stock,
+      'codes': codes,
+      // Retain backwards compatibility fields
       'value': description,
       'pointsCost': cost,
-      'status': available ? 'available' : 'redeemed',
+      'status': (available && stock > 0) ? 'available' : 'redeemed',
     };
   }
 
   // Backwards compatibility getters
+  bool get hasStock => stock > 0 && available;
   String get value => description;
   int get pointsCost => cost;
-  String get status => available ? 'available' : 'redeemed';
+  String get status => (available && stock > 0) ? 'available' : 'redeemed';
 }

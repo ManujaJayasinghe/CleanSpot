@@ -94,7 +94,7 @@ The only place a report photo is stored, kept separate from `reports` to ensure 
 
 ## 4. `coupons` Collection
 
-Stores reward vouchers and coupons available for redemption.
+Stores reward vouchers and coupons available for redemption. Supports both single-voucher items and quantity pools with a list of one-time codes.
 
 - **Document ID**: Auto-generated unique ID
 
@@ -105,8 +105,10 @@ Stores reward vouchers and coupons available for redemption.
 | `title` | `string` | Title of the reward / merchant offer. |
 | `description` | `string` | Reward value or details (e.g., "$5 Off", "15% Discount"). |
 | `cost` | `int` | Point cost required to redeem this coupon (alias `pointsCost`). |
-| `code` | `string` | Unique coupon redemption code. |
-| `available` | `bool` | Availability status: `true` if available, `false` once redeemed. |
+| `code` | `string` | Primary coupon redemption code (or current top code in pool). |
+| `codes` | `array of strings` (optional) | Pool of one-time unique promo codes for this merchant offer. |
+| `stock` | `int` (optional) | Remaining quantity available. Decremented atomically upon redemption. Defaults to `1` or `codes.length`. |
+| `available` | `bool` | Availability status: `true` if stock > 0, `false` once all codes are claimed. |
 
 ---
 

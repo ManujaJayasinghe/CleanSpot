@@ -196,16 +196,21 @@ class FirestoreService {
   // Part B: Rewards & Redemptions
   // ==========================================
 
-  /// Streams available coupons for the reward shop
+  /// Streams coupons for the reward shop (both in-stock and out-of-stock items)
   Stream<List<CouponModel>> watchAvailableCoupons() {
     return _couponsRef
-        .where('available', isEqualTo: true)
         .snapshots()
         .map((snap) {
           final list = snap.docs
               .map((d) => CouponModel.fromMap(d.id, d.data()))
               .toList();
-          list.sort((a, b) => a.cost.compareTo(b.cost));
+          // Sort by stock status (in-stock first), then by cost
+          list.sort((a, b) {
+            if (a.hasStock != b.hasStock) {
+              return a.hasStock ? -1 : 1;
+            }
+            return a.cost.compareTo(b.cost);
+          });
           return list;
         });
   }
@@ -225,6 +230,7 @@ class FirestoreService {
   }
 
   /// Atomically redeems a coupon for a user.
+  /// Supports both multi-code pool (with stock) and single-code legacy coupons.
   Future<String> redeemCoupon({
     required String uid,
     required CouponModel coupon,
@@ -246,13 +252,40 @@ class FirestoreService {
       }
 
       final couponSnapshot = await transaction.get(couponDocRef);
-      if (couponSnapshot.exists) {
-        final cData = couponSnapshot.data()!;
-        final isAvailable = cData['available'] is bool ? cData['available'] as bool : true;
-        if (!isAvailable) {
-          throw Exception('coupon_already_redeemed');
-        }
+      if (!couponSnapshot.exists) {
+        throw Exception('coupon_not_found');
       }
+
+      final cData = couponSnapshot.data()!;
+      final isAvailable = cData['available'] is bool ? cData['available'] as bool : true;
+      if (!isAvailable) {
+        throw Exception('coupon_already_redeemed');
+      }
+
+      // Check stock and codes array if present
+      final rawCodes = cData['codes'];
+      List<String> poolCodes = [];
+      if (rawCodes is List) {
+        poolCodes = rawCodes.map((e) => e.toString()).toList();
+      }
+
+      int currentStock = (cData['stock'] as num?)?.toInt() ??
+          (poolCodes.isNotEmpty ? poolCodes.length : 1);
+
+      if (currentStock <= 0) {
+        throw Exception('coupon_already_redeemed');
+      }
+
+      // Determine which code to assign
+      String codeToIssue;
+      if (poolCodes.isNotEmpty) {
+        codeToIssue = poolCodes.removeAt(0); // Pop first code
+      } else {
+        codeToIssue = cData['code'] as String? ?? coupon.code;
+      }
+
+      final newStock = currentStock - 1;
+      final stillAvailable = newStock > 0 && (poolCodes.isEmpty ? newStock > 0 : poolCodes.isNotEmpty);
 
       // 1. Deduct points
       final newPoints = currentPoints - coupon.cost;
@@ -261,11 +294,16 @@ class FirestoreService {
         'pointsBalance': newPoints,
       });
 
-      // 2. Mark coupon as unavailable
-      transaction.update(couponDocRef, {
-        'available': false,
-        'status': 'redeemed',
-      });
+      // 2. Update coupon stock and available status
+      final Map<String, dynamic> couponUpdates = {
+        'stock': newStock,
+        'available': stillAvailable,
+        'status': stillAvailable ? 'available' : 'redeemed',
+      };
+      if (rawCodes is List) {
+        couponUpdates['codes'] = poolCodes;
+      }
+      transaction.update(couponDocRef, couponUpdates);
 
       // 3. Add to redemptions collection
       final newRedemptionRef = _redemptionsRef.doc();
@@ -273,7 +311,7 @@ class FirestoreService {
         id: newRedemptionRef.id,
         uid: uid,
         couponId: coupon.id,
-        code: coupon.code,
+        code: codeToIssue,
         title: coupon.title,
         description: coupon.description,
         cost: coupon.cost,
@@ -281,7 +319,7 @@ class FirestoreService {
       );
       transaction.set(newRedemptionRef, redemption.toMap());
 
-      return coupon.code;
+      return codeToIssue;
     });
   }
 }
