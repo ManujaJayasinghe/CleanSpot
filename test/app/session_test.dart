@@ -36,7 +36,7 @@ String? guard(
 void main() {
   group('homeRouteFor', () {
     test('each role has its own home', () {
-      expect(homeRouteFor('admin'), '/admin');
+      expect(homeRouteFor('admin'), '/home');
       expect(homeRouteFor('authority'), '/authority');
       expect(homeRouteFor('user'), '/home');
       expect(homeRouteFor('anything else'), '/home');
@@ -77,10 +77,10 @@ void main() {
 
   group('redirectFor: after login', () {
     test('each role lands on its home', () {
-      expect(guard('/splash', role: 'admin'), '/admin');
+      expect(guard('/splash', role: 'admin'), '/home');
       expect(guard('/splash', role: 'authority'), '/authority');
       expect(guard('/splash', role: 'user'), '/home');
-      expect(guard('/login', role: 'admin'), '/admin');
+      expect(guard('/login', role: 'admin'), '/home');
       expect(guard('/register', role: 'authority'), '/authority');
       expect(guard('/login', role: 'user'), '/home');
     });

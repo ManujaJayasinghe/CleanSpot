@@ -246,11 +246,22 @@ class FirestoreService {
     required String description,
     required int cost,
     required String code,
+    int stock = 1,
+    List<String>? codes,
   }) async {
-    if (title.trim().isEmpty || code.trim().isEmpty) {
-      throw ArgumentError('A coupon needs a title and a code.');
+    if (title.trim().isEmpty) {
+      throw ArgumentError('A coupon needs a title.');
+    }
+    final effectiveCodes = (codes != null && codes.isNotEmpty)
+        ? codes.map((c) => c.trim()).where((c) => c.isNotEmpty).toList()
+        : [code.trim()];
+    if (effectiveCodes.isEmpty || effectiveCodes.every((c) => c.isEmpty)) {
+      throw ArgumentError('A coupon needs at least one code.');
     }
     if (cost < 0) throw ArgumentError.value(cost, 'cost', 'Cannot be negative.');
+    final effectiveStock = stock > 0 ? stock : effectiveCodes.length;
+    final primaryCode = code.trim().isNotEmpty ? code.trim() : effectiveCodes.first;
+
     final doc = _couponsRef.doc();
     await doc.set(
       CouponModel(
@@ -258,8 +269,10 @@ class FirestoreService {
         title: title.trim(),
         description: description.trim(),
         cost: cost,
-        code: code.trim(),
-        available: true,
+        code: primaryCode,
+        available: effectiveStock > 0,
+        stock: effectiveStock,
+        codes: effectiveCodes,
       ).toMap(),
     );
     return doc.id;
@@ -268,6 +281,16 @@ class FirestoreService {
   /// Deletes a coupon. Admin only.
   Future<void> removeCoupon(String couponId) async {
     await _couponsRef.doc(couponId).delete();
+  }
+
+  /// Streams all reports across all statuses, for admin statistics.
+  /// Admin only. Never reads `reportPhotos`.
+  Stream<List<ReportModel>> watchAllReports() {
+    return _reportsRef.snapshots().map(
+      (snap) => snap.docs
+          .map((d) => ReportModel.fromMap(d.id, d.data()))
+          .toList(),
+    );
   }
 
   /// Streams all valid/approved reports for the risk map.
