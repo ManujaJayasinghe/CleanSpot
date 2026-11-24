@@ -215,18 +215,6 @@ class ProfileScreen extends StatelessWidget {
                   label: const Text('Sign Out'),
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // Demo User Note
-              Center(
-                child: Text(
-                  'Fictional demonstration user',
-                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
             ],
           ),
         ),

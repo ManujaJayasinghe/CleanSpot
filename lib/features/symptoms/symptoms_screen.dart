@@ -1,5 +1,6 @@
 // lib/features/symptoms/symptoms_screen.dart
 import 'package:flutter/material.dart';
+import '../../app/theme_proposal.dart' as theme;
 import 'symptom_questions.dart';
 import 'symptom_result_screen.dart';
 
@@ -296,37 +297,10 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
   }
 
   Widget _option(String label, bool value) {
-    final selected = _answers[_index] == value;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
+    return _AnswerOption(
+      label: label,
+      selected: _answers[_index] == value,
       onTap: () => _select(value),
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      hoverColor: Colors.transparent,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 44,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected ? Colors.black : AppColors.border,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Center(
-          widthFactor: 1,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.button,
-            ),
-          ),  
-          
-        ),
-      ),
     );
   }
 
@@ -461,6 +435,72 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+/// One Yes / No answer box. It turns light green with a green border and green
+/// text while hovered (mouse), focused (keyboard) or pressed (touch has no
+/// hover), and when it is the selected answer.
+class _AnswerOption extends StatefulWidget {
+  const _AnswerOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_AnswerOption> createState() => _AnswerOptionState();
+}
+
+class _AnswerOptionState extends State<_AnswerOption> {
+  bool _hovered = false;
+  bool _focused = false;
+  bool _pressed = false;
+
+  bool get _active => _hovered || _focused || _pressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final green = widget.selected || _active;
+    final radius = BorderRadius.circular(16);
+
+    return InkWell(
+      borderRadius: radius,
+      onTap: widget.onTap,
+      onHover: (v) => setState(() => _hovered = v),
+      onFocusChange: (v) => setState(() => _focused = v),
+      onHighlightChanged: (v) => setState(() => _pressed = v),
+      // The state is drawn by the AnimatedContainer, not by ink colours.
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: green ? theme.AppColors.primaryLight : Colors.white,
+          borderRadius: radius,
+          border: Border.all(
+            color: green ? theme.AppColors.primary : AppColors.border,
+            width: widget.selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: green ? theme.AppColors.primaryDark : AppColors.button,
+          ),
+        ),
       ),
     );
   }

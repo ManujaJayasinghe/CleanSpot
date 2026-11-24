@@ -35,9 +35,12 @@ class CurrentUser {
 /// Builds with the signed-in user's live points balance from Firestore
 /// (users/{uid}.pointsBalance). Shows 0 until it loads.
 class UserPoints extends StatefulWidget {
-  const UserPoints({super.key, required this.builder});
+  const UserPoints({super.key, required this.builder, this.stream});
 
   final Widget Function(BuildContext context, int points) builder;
+
+  /// Profile stream override, for tests. Defaults to the signed-in user.
+  final Stream<UserModel?>? stream;
 
   @override
   State<UserPoints> createState() => _UserPointsState();
@@ -49,6 +52,10 @@ class _UserPointsState extends State<UserPoints> {
   @override
   void initState() {
     super.initState();
+    if (widget.stream != null) {
+      _stream = widget.stream;
+      return;
+    }
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) _stream = FirestoreService().watchUser(uid);
   }
