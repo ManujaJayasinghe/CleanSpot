@@ -17,6 +17,7 @@ import '../ai_validation/geohash.dart' as geohash;
 import '../ai_validation/report_check_controller.dart';
 import '../ai_validation/report_decision.dart' show kStillPresentMessage;
 import '../ai_validation/report_outcome.dart';
+import '../map/location_preview_map.dart';
 
 /// Shows the "UI FLOW" stage bar and the Simulate Approved/Rejected buttons.
 /// Off by default; enable with: flutter run --dart-define=DEMO_CONTROLS=true
@@ -596,7 +597,7 @@ class _ReportScreenState extends State<ReportScreen>
         ),
         const SizedBox(height: 14),
 
-        // Card 2: Illustrative Map card
+        // Card 2: Location card with a real map preview
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -606,39 +607,11 @@ class _ReportScreenState extends State<ReportScreen>
           ),
           child: Column(
             children: [
-              // Stylized mini map preview
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: SizedBox(
-                  height: 90,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _IllustrativeMapPainter(),
-                    child: Center(
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryDark,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryDark.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+              // Read-only OpenStreetMap preview of the captured location
+              LocationPreviewMap(
+                latitude: _capture?.latitude,
+                longitude: _capture?.longitude,
+                accuracyMeters: _capture?.accuracyMeters,
               ),
 
               // Location info row
@@ -1975,38 +1948,6 @@ class _ReportScreenState extends State<ReportScreen>
       ],
     );
   }
-}
-
-/// Custom painter for the illustrative mini map in Step 1
-class _IllustrativeMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bgPaint = Paint()..color = const Color(0xFFEFF5EF);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
-
-    final roadPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 26
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final roadPath = Path();
-    roadPath.moveTo(-20, size.height * 0.6);
-    roadPath.lineTo(size.width * 0.38, size.height * 0.55);
-    roadPath.lineTo(size.width * 0.52, size.height * 0.45);
-    roadPath.lineTo(size.width + 20, size.height * 0.45);
-    canvas.drawPath(roadPath, roadPaint);
-
-    final blockPaint = Paint()..color = const Color(0xFFE2EDE2);
-    final blockRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(size.width * 0.68, 6, size.width * 0.22, size.height * 0.7),
-      const Radius.circular(8),
-    );
-    canvas.drawRRect(blockRect, blockPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Custom painter for the camera reticle corner brackets in Step 2

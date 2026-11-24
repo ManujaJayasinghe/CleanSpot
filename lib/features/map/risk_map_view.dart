@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme_proposal.dart';
 import '../../models/report_model.dart';
 import 'map_filters.dart';
+import 'map_projection.dart';
 
 /// The live risk map: real OpenStreetMap street tiles with a heatmap or marker
 /// overlay of valid reports, on an interactive Web Mercator viewport. Works
@@ -57,32 +58,6 @@ class _RiskMapViewState extends State<RiskMapView> {
   /// ID of the newest report we already auto-centered on, so a newly approved
   /// standing-water report automatically moves the map to its location once.
   String? _autoCenteredReportId;
-
-  // ---------------------------------------------------------------------------
-  // Web Mercator projection helpers
-  // ---------------------------------------------------------------------------
-
-  static double _worldSize(double zoom) => 256.0 * math.pow(2.0, zoom);
-
-  static Offset _project(double lat, double lng, double zoom) {
-    final size = _worldSize(zoom);
-    final x = (lng + 180.0) / 360.0 * size;
-    final sinLat = math.sin(lat * math.pi / 180.0).clamp(-0.9999, 0.9999);
-    final y =
-        (0.5 - math.log((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * math.pi)) *
-        size;
-    return Offset(x, y);
-  }
-
-  static (double lat, double lng) _unproject(Offset world, double zoom) {
-    final size = _worldSize(zoom);
-    final lng = ((world.dx / size) * 360.0 - 180.0).clamp(-180.0, 180.0);
-    final n = math.pi - 2.0 * math.pi * (world.dy / size);
-    final lat =
-        ((180.0 / math.pi) * math.atan(0.5 * (math.exp(n) - math.exp(-n))))
-            .clamp(-85.0, 85.0);
-    return (lat, lng);
-  }
 
   void _centerOnReport(ReportModel report, {double zoom = _focusedZoom}) {
     setState(() {
@@ -181,52 +156,21 @@ class _RiskMapViewState extends State<RiskMapView> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
-        final centerWorld = _project(_centerLat, _centerLng, _zoom);
+        final centerWorld = project(_centerLat, _centerLng, _zoom);
 
-        // Compute integer tile zoom and visible OpenStreetMap tiles.
-        final tileZ = _zoom.round().clamp(3, 18);
-        final tileScale = math.pow(2.0, _zoom - tileZ).toDouble();
-        final tileScreenSize = 256.0 * tileScale;
-        final maxTileIndex = (1 << tileZ) - 1;
-
-        final minTx = ((centerWorld.dx - width / 2) / tileScreenSize).floor();
-        final maxTx = ((centerWorld.dx + width / 2) / tileScreenSize).floor();
-        final minTy = ((centerWorld.dy - height / 2) / tileScreenSize).floor();
-        final maxTy = ((centerWorld.dy + height / 2) / tileScreenSize).floor();
-
-        final tiles = <Widget>[];
-        for (var ty = minTy; ty <= maxTy; ty++) {
-          if (ty < 0 || ty > maxTileIndex) continue;
-          for (var tx = minTx; tx <= maxTx; tx++) {
-            final wrappedTx =
-                ((tx % (maxTileIndex + 1)) + (maxTileIndex + 1)) %
-                (maxTileIndex + 1);
-            final left = tx * tileScreenSize - centerWorld.dx + width / 2;
-            final top = ty * tileScreenSize - centerWorld.dy + height / 2;
-            tiles.add(
-              Positioned(
-                key: ValueKey('tile-$tileZ-$wrappedTx-$ty'),
-                left: left,
-                top: top,
-                width: tileScreenSize + 0.5,
-                height: tileScreenSize + 0.5,
-                child: Image.network(
-                  'https://tile.openstreetmap.org/$tileZ/$wrappedTx/$ty.png',
-                  headers: const {'User-Agent': 'CleanSpot/1.0 (MAD Project)'},
-                  fit: BoxFit.fill,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-              ),
-            );
-          }
-        }
+        // Visible OpenStreetMap tiles for this viewport.
+        final tiles = buildOsmTiles(
+          centerWorld: centerWorld,
+          zoom: _zoom,
+          width: width,
+          height: height,
+        );
 
         // Project each valid report to screen coordinates.
         final projectedReports =
             <({ReportModel report, Offset pos, int nearby})>[];
         for (final r in reports) {
-          final world = _project(
+          final world = project(
             r.location.latitude,
             r.location.longitude,
             _zoom,
@@ -266,12 +210,12 @@ class _RiskMapViewState extends State<RiskMapView> {
                 _zoom = (_baseScaleZoom + math.log(details.scale) / math.ln2)
                     .clamp(6.0, 18.0);
               }
-              final currentWorld = _project(_centerLat, _centerLng, _zoom);
+              final currentWorld = project(_centerLat, _centerLng, _zoom);
               final shifted = Offset(
                 currentWorld.dx - delta.dx,
                 currentWorld.dy - delta.dy,
               );
-              final (newLat, newLng) = _unproject(shifted, _zoom);
+              final (newLat, newLng) = unproject(shifted, _zoom);
               _centerLat = newLat;
               _centerLng = newLng;
             });
