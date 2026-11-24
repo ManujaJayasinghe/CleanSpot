@@ -7,6 +7,9 @@ import '../../app/session.dart';
 import '../../app/theme_proposal.dart';
 import '../../services/firestore_service.dart';
 
+/// The CleanSpot logo shown on the login screen.
+const String kCleanSpotLogoAsset = 'assets/images/cleanspot_logo.png';
+
 /// CleanSpot Login & Registration screen matching the design mockup.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.blocked = false});
@@ -72,10 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return _run(
-      () => auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      ),
+      () => auth.signInWithEmailAndPassword(email: email, password: password),
     );
   }
 
@@ -92,7 +92,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showForgotPasswordDialog() {
-    final resetEmailController = TextEditingController(text: _email.text.trim());
+    final resetEmailController = TextEditingController(
+      text: _email.text.trim(),
+    );
 
     showDialog<void>(
       context: context,
@@ -126,9 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: resetEmailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  hintText: 'you@example.com',
-                ),
+                decoration: const InputDecoration(hintText: 'you@example.com'),
               ),
             ],
           ),
@@ -142,12 +142,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 final email = resetEmailController.text.trim();
                 if (email.isNotEmpty) {
                   try {
-                    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                    await FirebaseAuth.instance.sendPasswordResetEmail(
+                      email: email,
+                    );
                     if (context.mounted) {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Password reset link sent! Check your inbox.'),
+                          content: Text(
+                            'Password reset link sent! Check your inbox.',
+                          ),
                         ),
                       );
                     }
@@ -192,204 +196,369 @@ class _LoginScreenState extends State<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 10),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10),
 
-                      // CleanSpot Brand Header (Logo Badge + CleanSpot title)
-                      Row(
+                  // CleanSpot Brand Header (Logo Badge + CleanSpot title)
+                  Row(
+                    children: [
+                      // CleanSpot logo (shield, leaf and water drop)
+                      Image.asset(
+                        kCleanSpotLogoAsset,
+                        width: 52,
+                        height: 52,
+                        semanticLabel: 'CleanSpot logo',
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'CleanSpot',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF145A32),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Brand Tagline
+                  const Text(
+                    'Report it. Clean it. Protect your\ncommunity.',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 16,
+                      color: Color(0xFF6B756F),
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+
+                  // Welcome Headline
+                  const Text(
+                    'Welcome back',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Welcome Subtitle
+                  const Text(
+                    "Let's keep our communities safer.",
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 15,
+                      color: Color(0xFF6B756F),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Email Label
+                  const Text(
+                    'Email',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Email Input Field
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: 'you@example.com',
+                      hintStyle: const TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        color: Color(0xFF9E9E9E),
+                        fontSize: 15,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE3E8E3),
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE3E8E3),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Password Label
+                  const Text(
+                    'Password',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Password Input Field
+                  TextField(
+                    controller: _password,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your password',
+                      hintStyle: const TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        color: Color(0xFF9E9E9E),
+                        fontSize: 15,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: const Color(0xFF9E9E9E),
+                          size: 22,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE3E8E3),
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE3E8E3),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Forgot Password Link
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: _showForgotPasswordDialog,
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF145A32),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Error message banner
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.errorBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Center(
-                              child: _CleanSpotSproutLogo(size: 28),
-                            ),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.errorText,
+                            size: 20,
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'CleanSpot',
-                            style: TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF145A32),
-                              letterSpacing: -0.5,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                color: AppColors.errorText,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
 
-                      // Brand Tagline
-                      const Text(
-                        'Report it. Clean it. Protect your\ncommunity.',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 16,
-                          color: Color(0xFF6B756F),
-                          height: 1.35,
+                  // Primary Action Button (Sign In / Sign Up)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E7E44),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      const SizedBox(height: 36),
+                      child: _loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Sign In',
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
-                      // Welcome Headline
-                      const Text(
-                        'Welcome back',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.5,
-                        ),
+                  // "or continue with" Divider
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Divider(color: Color(0xFFE0E0E0), thickness: 1),
                       ),
-                      const SizedBox(height: 6),
-
-                      // Welcome Subtitle
-                      const Text(
-                        "Let's keep our communities safer.",
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 15,
-                          color: Color(0xFF6B756F),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-
-                      // Email Label
-                      const Text(
-                        'Email',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Email Input Field
-                      TextField(
-                        controller: _email,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          hintText: 'you@example.com',
-                          hintStyle: const TextStyle(
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text(
+                          'or continue with',
+                          style: TextStyle(
                             fontFamily: AppTypography.fontFamily,
-                            color: Color(0xFF9E9E9E),
-                            fontSize: 15,
-                          ),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE3E8E3),
-                              width: 1,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE3E8E3),
-                              width: 1,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
+                            fontSize: 13,
+                            color: const Color(0xFF6B756F)
+                                .withValues(alpha: 0.9),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const Expanded(
+                        child: Divider(color: Color(0xFFE0E0E0), thickness: 1),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
 
-                      // Password Label
-                      const Text(
-                        'Password',
-                        style: TextStyle(
-                          fontFamily: AppTypography.fontFamily,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                  // "Continue with Google" Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: _loading ? null : _google,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.surface,
+                        foregroundColor: const Color(0xFF145A32),
+                        side: const BorderSide(
+                          color: Color(0xFFE3E8E3),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'G',
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF145A32),
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Continue with Google',
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF145A32),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
 
-                      // Password Input Field
-                      TextField(
-                        controller: _password,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          hintText: 'Enter your password',
-                          hintStyle: const TextStyle(
+                  // Footer Toggle (Don't have an account? Sign up)
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
                             fontFamily: AppTypography.fontFamily,
-                            color: Color(0xFF9E9E9E),
-                            fontSize: 15,
-                          ),
-                          filled: true,
-                          fillColor: AppColors.surface,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: const Color(0xFF9E9E9E),
-                              size: 22,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE3E8E3),
-                              width: 1,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE3E8E3),
-                              width: 1,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 1.5,
-                            ),
+                            fontSize: 14,
+                            color: Color(0xFF6B756F),
                           ),
                         ),
-                      ),
-
-                      // Forgot Password Link
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: InkWell(
-                          onTap: _showForgotPasswordDialog,
+                        InkWell(
+                          onTap: () => context.go('/register'),
                           child: const Text(
-                            'Forgot password?',
+                            'Sign up',
                             style: TextStyle(
                               fontFamily: AppTypography.fontFamily,
                               fontSize: 14,
@@ -398,265 +567,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                      ),
-
-                      // Error message banner
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.errorBg,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.error.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                color: AppColors.errorText,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _error!,
-                                  style: const TextStyle(
-                                    fontFamily: AppTypography.fontFamily,
-                                    color: AppColors.errorText,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
-                      const SizedBox(height: 24),
-
-                      // Primary Action Button (Sign In / Sign Up)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E7E44),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontFamily: AppTypography.fontFamily,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // "or continue with" Divider
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Divider(
-                              color: Color(0xFFE0E0E0),
-                              thickness: 1,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              'or continue with',
-                              style: TextStyle(
-                                fontFamily: AppTypography.fontFamily,
-                                fontSize: 13,
-                                color: const Color(0xFF6B756F).withValues(alpha: 0.9),
-                              ),
-                            ),
-                          ),
-                          const Expanded(
-                            child: Divider(
-                              color: Color(0xFFE0E0E0),
-                              thickness: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      // "Continue with Google" Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton(
-                          onPressed: _loading ? null : _google,
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: AppColors.surface,
-                            foregroundColor: const Color(0xFF145A32),
-                            side: const BorderSide(
-                              color: Color(0xFFE3E8E3),
-                              width: 1,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'G',
-                                style: TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF145A32),
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Continue with Google',
-                                style: TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF145A32),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Footer Toggle (Don't have an account? Sign up)
-                      Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                              const Text(
-                                "Don't have an account? ",
-                                style: TextStyle(
-                                  fontFamily: AppTypography.fontFamily,
-                                  fontSize: 14,
-                                  color: Color(0xFF6B756F),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () => context.go('/register'),
-                                child: const Text(
-                                  'Sign up',
-                                  style: TextStyle(
-                                    fontFamily: AppTypography.fontFamily,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF145A32),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
-            ],
+            ),
           ),
-        );
-  }
-}
-
-/// Custom painter representing CleanSpot's twin-leaf green sprout icon.
-class _CleanSpotSproutLogo extends StatelessWidget {
-  final double size;
-
-  const _CleanSpotSproutLogo({this.size = 28});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _SproutPainter(),
+        ],
+      ),
     );
   }
-}
-
-class _SproutPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF1E7E44)
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // Left curved leaf
-    final leftPath = Path()
-      ..moveTo(w * 0.46, h * 0.85)
-      ..cubicTo(
-        w * 0.44,
-        h * 0.45,
-        w * 0.12,
-        h * 0.35,
-        w * 0.10,
-        h * 0.20,
-      )
-      ..cubicTo(
-        w * 0.38,
-        h * 0.18,
-        w * 0.52,
-        h * 0.50,
-        w * 0.46,
-        h * 0.85,
-      )
-      ..close();
-
-    // Right curved leaf
-    final rightPath = Path()
-      ..moveTo(w * 0.54, h * 0.85)
-      ..cubicTo(
-        w * 0.56,
-        h * 0.45,
-        w * 0.88,
-        h * 0.35,
-        w * 0.90,
-        h * 0.20,
-      )
-      ..cubicTo(
-        w * 0.62,
-        h * 0.18,
-        w * 0.48,
-        h * 0.50,
-        w * 0.54,
-        h * 0.85,
-      )
-      ..close();
-
-    canvas.drawPath(leftPath, paint);
-    canvas.drawPath(rightPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
