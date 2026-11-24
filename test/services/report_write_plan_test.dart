@@ -31,6 +31,7 @@ ReportModel report({
 }
 
 void main() {
+  clearedUpdateTests();
   test('the points per valid report is one constant, 10', () {
     expect(kPointsPerValidReport, 10);
     expect(reportStatusValid, 'valid');
@@ -215,6 +216,37 @@ void main() {
 
     test('needs a confirmation id', () {
       expect(() => buildStillPresentUpdate(''), throwsArgumentError);
+    });
+  });
+}
+
+void clearedUpdateTests() {
+  group('cleared update', () {
+    test('sets the status, who cleared it and a server time', () {
+      final update = buildClearedUpdate('officer1');
+      expect(update.keys.toSet(), {'status', 'clearedBy', 'clearedAt'});
+      expect(update['status'], 'cleared');
+      expect(update['status'], reportStatusCleared);
+      expect(update['clearedBy'], 'officer1');
+      expect(update['clearedAt'], isA<FieldValue>());
+    });
+
+    test('needs the uid of who cleared it', () {
+      expect(() => buildClearedUpdate(''), throwsArgumentError);
+    });
+
+    test('touches nothing else (the report keeps its fields)', () {
+      final keys = buildClearedUpdate('o').keys;
+      for (final k in ['uid', 'type', 'lat', 'lng', 'geohash', 'photoId', 'aiCategory']) {
+        expect(keys.contains(k), isFalse, reason: k);
+      }
+    });
+
+    test('the AI flow never saves a cleared report', () {
+      expect(
+        () => buildReportWritePlan(report(status: reportStatusCleared), 'r1', photoBase64: _photo),
+        throwsArgumentError,
+      );
     });
   });
 }

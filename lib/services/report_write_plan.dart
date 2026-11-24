@@ -6,9 +6,11 @@ import '../models/report_model.dart';
 /// This is the only place the amount is defined.
 const int kPointsPerValidReport = 10;
 
-/// Status of an approved report, and of one the AI rejected.
+/// Status of an approved report, of one the AI rejected, and of one an
+/// authority or admin marked as cleared (the site was dealt with).
 const String reportStatusValid = 'valid';
 const String reportStatusRejected = 'rejected';
+const String reportStatusCleared = 'cleared';
 
 /// What to write for one report. Built by [buildReportWritePlan] so the rules
 /// (what a valid and a rejected report each write) can be tested without
@@ -106,5 +108,21 @@ Map<String, dynamic> buildStillPresentUpdate(String confirmationId) {
     'confirmationCount': FieldValue.increment(1),
     'lastConfirmedAt': FieldValue.serverTimestamp(),
     'lastConfirmationId': confirmationId,
+  };
+}
+
+/// The update written to `reports/{id}` when an authority or admin marks the
+/// site as cleared: status 'cleared', who did it ([clearedBy], a uid) and a
+/// server-time `clearedAt`. The report keeps its other fields; its photo
+/// document is deleted separately. A cleared report is no longer 'valid', so it
+/// leaves the map and does not count for the still-present check.
+Map<String, dynamic> buildClearedUpdate(String clearedBy) {
+  if (clearedBy.isEmpty) {
+    throw ArgumentError('A cleared report needs the uid of who cleared it.');
+  }
+  return {
+    'status': reportStatusCleared,
+    'clearedBy': clearedBy,
+    'clearedAt': FieldValue.serverTimestamp(),
   };
 }

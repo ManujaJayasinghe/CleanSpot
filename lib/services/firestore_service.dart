@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/coupon_model.dart';
 import '../models/redemption_model.dart';
@@ -10,10 +11,17 @@ import '../models/user_model.dart';
 import 'report_write_plan.dart';
 
 class FirestoreService {
-  FirestoreService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  FirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _authOverride = auth;
 
   final FirebaseFirestore _db;
+  final FirebaseAuth? _authOverride;
+
+  /// The signed-in user's uid (looked up when needed, so tests that never use
+  /// it do not need Firebase auth).
+  String? get _currentUid =>
+      (_authOverride ?? FirebaseAuth.instance).currentUser?.uid;
 
   DocumentReference<Map<String, dynamic>> _userRef(String uid) =>
       _db.collection('users').doc(uid);
@@ -180,6 +188,86 @@ class FirestoreService {
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });
+  }
+
+  /// Marks a report as cleared (the site was dealt with). For authority and
+  /// admin dashboards only; firestore.rules rejects anyone else.
+  ///
+  /// In ONE batch: `reports/{id}` becomes status 'cleared' with `clearedBy`
+  /// (the signed-in uid) and a server-time `clearedAt`, and the
+  /// `reportPhotos/{id}` photo is deleted. A cleared report is no longer
+  /// 'valid', so it leaves the map and is not found by the still-present check.
+  /// Throws on any failure, including a report that is not currently 'valid'.
+  Future<void> markReportCleared(String reportId) async {
+    final uid = _currentUid;
+    if (uid == null) throw StateError('Not signed in.');
+    final batch = _db.batch()
+      ..update(_reportsRef.doc(reportId), buildClearedUpdate(uid))
+      ..delete(_reportPhotosRef.doc(reportId));
+    await batch.commit();
+    _photoCache.remove(reportId);
+  }
+
+  // ==========================================
+  // Part C: Admin
+  // ==========================================
+
+  /// Sets a user's role: 'user', 'admin' or 'authority'. Admin only.
+  Future<void> setUserRole(String uid, String role) async {
+    if (!kUserRoles.contains(role)) {
+      throw ArgumentError.value(role, 'role', 'Must be one of $kUserRoles.');
+    }
+    await _userRef(uid).update({'role': role});
+  }
+
+  /// Blocks or unblocks a user. A blocked user is signed out of the app and the
+  /// rules stop them saving anything. Admin only.
+  Future<void> setUserBlocked(String uid, bool blocked) async {
+    await _userRef(uid).update({'blocked': blocked});
+  }
+
+  /// Streams every user (name order), for the admin dashboard. Admin only.
+  Stream<List<UserModel>> watchAllUsers() {
+    return _db.collection('users').snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => UserModel.fromMap(d.id, d.data()))
+          .toList();
+      list.sort(
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+      );
+      return list;
+    });
+  }
+
+  /// Adds an available coupon to the reward shop. Admin only. Returns its id.
+  Future<String> addCoupon({
+    required String title,
+    required String description,
+    required int cost,
+    required String code,
+  }) async {
+    if (title.trim().isEmpty || code.trim().isEmpty) {
+      throw ArgumentError('A coupon needs a title and a code.');
+    }
+    if (cost < 0) throw ArgumentError.value(cost, 'cost', 'Cannot be negative.');
+    final doc = _couponsRef.doc();
+    await doc.set(
+      CouponModel(
+        id: doc.id,
+        title: title.trim(),
+        description: description.trim(),
+        cost: cost,
+        code: code.trim(),
+        available: true,
+      ).toMap(),
+    );
+    return doc.id;
+  }
+
+  /// Deletes a coupon. Admin only.
+  Future<void> removeCoupon(String couponId) async {
+    await _couponsRef.doc(couponId).delete();
   }
 
   /// Streams all valid/approved reports for the risk map.
