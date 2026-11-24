@@ -78,7 +78,6 @@ double _top(WidgetTester t, Finder f) => t.getTopLeft(f).dy;
 double _bottom(WidgetTester t, Finder f) => t.getBottomLeft(f).dy;
 
 void main() {
-  final frame = find.byKey(const ValueKey('home-points-map-card'));
   final points = find.byKey(const ValueKey('home-points-card'));
   final map = find.byType(RiskMapPreview);
   final reportButton = find.byKey(const ValueKey('home-report-button'));
@@ -124,66 +123,76 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('points and map share one green LeafBackground frame',
-      (tester) async {
+  testWidgets('points card and map are two separate cards', (tester) async {
     await _pumpAt(tester, const Size(412, 915));
 
-    // Exactly one leaf card on Home: the frame. The button has none.
+    // One dark green leaf card (the points card); the map is not inside it.
     expect(find.byType(LeafBackground), findsOneWidget);
     expect(
-      find.descendant(of: frame, matching: find.byType(RiskMapPreview)),
-      findsOneWidget,
+      find.descendant(of: find.byType(LeafBackground), matching: map),
+      findsNothing,
     );
+    expect(points, findsOneWidget);
     expect(
-      find.descendant(of: frame, matching: find.text('AVAILABLE POINTS')),
+      find.descendant(
+        of: find.byType(LeafBackground),
+        matching: find.text('AVAILABLE POINTS'),
+      ),
       findsOneWidget,
     );
-    expect(find.descendant(of: frame, matching: reportButton), findsNothing);
 
-    final frameBox = tester
+    final pointsBox = tester
         .widget<Container>(
-          find.descendant(of: frame, matching: find.byType(Container)).first,
+          find.descendant(
+            of: find.byType(LeafBackground),
+            matching: find.byType(Container),
+          ).first,
         )
         .decoration as BoxDecoration;
-    expect(frameBox.color, const Color(0xFF145A32));
-    expect(frameBox.borderRadius, BorderRadius.circular(24));
+    expect(pointsBox.color, const Color(0xFF145A32));
+    expect(pointsBox.borderRadius, BorderRadius.circular(20));
 
-    // The frame runs from the top of the points row to the bottom of the map.
-    expect(_top(tester, frame), closeTo(_top(tester, points), 0.5));
-    // The map is inset 8 px on the left, right and bottom.
-    final f = tester.getRect(frame);
-    final m = tester.getRect(map);
-    expect(m.left - f.left, 8);
-    expect(f.right - m.right, 8);
-    expect(f.bottom - m.bottom, 8);
-    // Below the header, flush with it.
-    expect(m.top, greaterThanOrEqualTo(tester.getRect(points).bottom - 0.5));
-
-    // The map has its own 16 px corners and no border of its own.
+    // The map is a standalone light card with its own border and 20 px
+    // corners, a gap below the points card, and full width.
     final mapBox = tester
         .widget<Container>(
           find.descendant(of: map, matching: find.byType(Container)).first,
         )
         .decoration as BoxDecoration;
-    expect(mapBox.borderRadius, BorderRadius.circular(16));
-    expect(mapBox.border, isNull);
+    expect(mapBox.border, isNotNull);
+    expect(mapBox.color, AppColors.surface);
+    expect(mapBox.borderRadius, BorderRadius.circular(20));
+    expect(tester.getSize(map).width, 412 - 40);
+    expect(
+      _top(tester, map) - _bottom(tester, find.byType(LeafBackground)),
+      closeTo(12, 0.5),
+    );
+
+    // The map keeps its legend and the "Open full map" chip.
+    expect(find.text('Open full map'), findsOneWidget);
 
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the Report button is a solid AppColors.primary fill with no '
-      'leaf or circle', (tester) async {
+  testWidgets('the Report button is a plain solid AppColors.primary '
+      'ElevatedButton with no leaf or circle', (tester) async {
     await _pumpAt(tester, const Size(412, 915));
 
-    final material = tester.widget<Material>(
-      find.ancestor(of: reportButton, matching: find.byType(Material)).first,
-    );
-    expect(material.color, AppColors.primary);
-    expect(material.borderRadius, BorderRadius.circular(18));
+    final button = tester.widget<ElevatedButton>(reportButton);
+    final style = button.style!;
+    expect(style.backgroundColor!.resolve({}), AppColors.primary);
+    expect(style.foregroundColor!.resolve({}), AppColors.surface);
+    expect(style.elevation!.resolve({}), 0);
+    final shape = style.shape!.resolve({}) as RoundedRectangleBorder;
+    expect(shape.borderRadius, BorderRadius.circular(18));
     expect(tester.getSize(reportButton).height, 56);
     expect(tester.getSize(reportButton).width, 412 - 40);
 
-    // The only leaf icon on Home is the one in the frame.
+    // No leaf decoration in the button: the only leaf is in the points card.
+    expect(
+      find.descendant(of: reportButton, matching: find.byType(LeafBackground)),
+      findsNothing,
+    );
     expect(find.byIcon(Icons.eco_outlined), findsOneWidget);
     expect(find.byIcon(Icons.add_circle_outline), findsOneWidget);
     expect(find.text('Report a Breeding Site'), findsOneWidget);

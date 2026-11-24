@@ -117,12 +117,15 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
 
-                    // One green frame: available points on top, the live risk
-                    // map inside it. Takes all the leftover height.
+                    // Available points (compact, same style as the Rewards card)
+                    _AvailablePointsCard(stream: pointsStream),
+                    const SizedBox(height: 12),
+
+                    // Live risk map preview: takes all the leftover height.
                     Expanded(
-                      child: _PointsMapFrame(
-                        pointsStream: pointsStream,
-                        mapReports: mapReports,
+                      child: _MinHeightSlot(
+                        minHeight: minMapHeight,
+                        child: RiskMapPreview(reports: mapReports),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -182,58 +185,10 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// The green frame at the top of Home: the "AVAILABLE POINTS" header on top
-/// and the live risk map inside the same [LeafBackground] card, inset by 8 px
-/// so a thin green outline shows around it.
-///
-/// The lighter circle and leaf decorate the header only: the map area has an
-/// opaque green background that covers them below the header. The map keeps a
-/// minimum height of [HomeScreen.minMapHeight] and takes all the leftover
-/// height.
-class _PointsMapFrame extends StatelessWidget {
-  const _PointsMapFrame({this.pointsStream, this.mapReports});
-
-  final Stream<UserModel?>? pointsStream;
-  final Stream<List<ReportModel>>? mapReports;
-
-  @override
-  Widget build(BuildContext context) {
-    return LeafBackground(
-      key: const ValueKey('home-points-map-card'),
-      borderRadius: BorderRadius.circular(24),
-      circleSize: 150,
-      circleTop: -37,
-      circleRight: -48,
-      leafSize: 56,
-      child: Column(
-        children: [
-          _PointsHeader(stream: pointsStream),
-          Expanded(
-            child: ColoredBox(
-              color: LeafBackground.darkGreen,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                child: _MinHeightSlot(
-                  minHeight: HomeScreen.minMapHeight,
-                  child: RiskMapPreview(
-                    reports: mapReports,
-                    standalone: false,
-                    cornerRadius: 16,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "AVAILABLE POINTS" label with the live number and "points" under it, about
-/// 70 px tall.
-class _PointsHeader extends StatelessWidget {
-  const _PointsHeader({this.stream});
+/// Compact "AVAILABLE POINTS" card in the leaf style of the Rewards balance
+/// card: label, live number and "points" in one row, about 80 px tall.
+class _AvailablePointsCard extends StatelessWidget {
+  const _AvailablePointsCard({this.stream});
 
   final Stream<UserModel?>? stream;
 
@@ -241,11 +196,15 @@ class _PointsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
+    return LeafBackground(
       key: const ValueKey('home-points-card'),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: SizedBox(
-        width: double.infinity,
+      borderRadius: BorderRadius.circular(20),
+      circleSize: 150,
+      circleTop: null,
+      circleRight: -48,
+      leafSize: 56,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -259,6 +218,7 @@ class _PointsHeader extends StatelessWidget {
                 letterSpacing: 1.1,
               ),
             ),
+            const SizedBox(height: 2),
             UserPoints(
               stream: stream,
               builder: (context, points) => Row(
@@ -296,52 +256,46 @@ class _PointsHeader extends StatelessWidget {
   }
 }
 
-/// Full-width "Report a Breeding Site" button: solid [AppColors.primary] with
-/// the ripple from its InkWell.
+/// Full-width "Report a Breeding Site" button: a plain solid
+/// [AppColors.primary] fill (no decoration), so the normal button ripple works.
 class _ReportButton extends StatelessWidget {
   const _ReportButton();
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 56,
       width: double.infinity,
-      child: Material(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const ValueKey('home-report-button'),
-          onTap: () => context.go('/report'),
-          // FittedBox: the label shrinks instead of overflowing on a narrow
-          // screen or with very large text.
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline,
-                      size: 22,
-                      color: AppColors.surface,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Report a Breeding Site',
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamily,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.surface,
-                      ),
-                    ),
-                  ],
+      height: 56,
+      child: ElevatedButton(
+        key: const ValueKey('home-report-button'),
+        onPressed: () => context.go('/report'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.surface,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+        // FittedBox: the label shrinks instead of overflowing on a narrow
+        // screen or with very large text.
+        child: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_circle_outline, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Report a Breeding Site',
+                style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
