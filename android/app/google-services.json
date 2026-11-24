@@ -12,7 +12,20 @@
           "package_name": "com.example.clean_spot"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "502186374219-ga5oi4s63cs9r3r08fe7s64k3g8632vh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.clean_spot",
+            "certificate_hash": "5197227124f813b32b151be17a3db94d91858821"
+          }
+        },
+        {
+          "client_id": "502186374219-ab9tsri3ro185h3dfpf852l28neb0ang.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAAw7OlcpEnkZ_Hy7oZ9RXJBDe9MOfUrAE"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "502186374219-ab9tsri3ro185h3dfpf852l28neb0ang.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "502186374219-sol3hnjcvadco10noverplfccvsridi6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.cleanSpot"
+              }
+            }
+          ]
         }
       }
     }
