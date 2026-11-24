@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/coupon_model.dart';
 import '../models/redemption_model.dart';
@@ -10,10 +11,17 @@ import '../models/user_model.dart';
 import 'report_write_plan.dart';
 
 class FirestoreService {
-  FirestoreService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  FirestoreService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _authOverride = auth;
 
   final FirebaseFirestore _db;
+  final FirebaseAuth? _authOverride;
+
+  /// The signed-in user's uid (looked up when needed, so tests that never use
+  /// it do not need Firebase auth).
+  String? get _currentUid =>
+      (_authOverride ?? FirebaseAuth.instance).currentUser?.uid;
 
   DocumentReference<Map<String, dynamic>> _userRef(String uid) =>
       _db.collection('users').doc(uid);
@@ -101,6 +109,32 @@ class FirestoreService {
     return reportRef.id;
   }
 
+  /// Marks an existing report as still present (the "still present" rule):
+  /// adds one to `confirmationCount` and sets `lastConfirmedAt` to server time.
+  /// Nothing else is written: no new report, no photo and no points.
+  ///
+  /// [confirmationId] identifies this one confirmation (create it once per
+  /// outcome, like a report id). Runs in a transaction that reads the report
+  /// from the server first: if it already carries this [confirmationId] (an
+  /// earlier attempt succeeded but its reply was lost), nothing is written, so
+  /// a retry never counts twice. Throws on any failure, including offline and
+  /// a report that no longer exists.
+  Future<void> markReportStillPresent(
+    String reportId, {
+    required String confirmationId,
+  }) async {
+    final reportRef = _reportsRef.doc(reportId);
+    final update = buildStillPresentUpdate(confirmationId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(reportRef);
+      if (!snap.exists) {
+        throw StateError('Report $reportId no longer exists.');
+      }
+      if (snap.data()?['lastConfirmationId'] == confirmationId) return;
+      tx.update(reportRef, update);
+    });
+  }
+
   // Photos already loaded this session, and loads in progress, shared by every
   // FirestoreService instance.
   static final Map<String, Uint8List> _photoCache = {};
@@ -156,6 +190,109 @@ class FirestoreService {
         });
   }
 
+  /// Marks a report as cleared (the site was dealt with). For authority and
+  /// admin dashboards only; firestore.rules rejects anyone else.
+  ///
+  /// In ONE batch: `reports/{id}` becomes status 'cleared' with `clearedBy`
+  /// (the signed-in uid) and a server-time `clearedAt`, and the
+  /// `reportPhotos/{id}` photo is deleted. A cleared report is no longer
+  /// 'valid', so it leaves the map and is not found by the still-present check.
+  /// Throws on any failure, including a report that is not currently 'valid'.
+  Future<void> markReportCleared(String reportId) async {
+    final uid = _currentUid;
+    if (uid == null) throw StateError('Not signed in.');
+    final batch = _db.batch()
+      ..update(_reportsRef.doc(reportId), buildClearedUpdate(uid))
+      ..delete(_reportPhotosRef.doc(reportId));
+    await batch.commit();
+    _photoCache.remove(reportId);
+  }
+
+  // ==========================================
+  // Part C: Admin
+  // ==========================================
+
+  /// Sets a user's role: 'user', 'admin' or 'authority'. Admin only.
+  Future<void> setUserRole(String uid, String role) async {
+    if (!kUserRoles.contains(role)) {
+      throw ArgumentError.value(role, 'role', 'Must be one of $kUserRoles.');
+    }
+    await _userRef(uid).update({'role': role});
+  }
+
+  /// Blocks or unblocks a user. A blocked user is signed out of the app and the
+  /// rules stop them saving anything. Admin only.
+  Future<void> setUserBlocked(String uid, bool blocked) async {
+    await _userRef(uid).update({'blocked': blocked});
+  }
+
+  /// Streams every user (name order), for the admin dashboard. Admin only.
+  Stream<List<UserModel>> watchAllUsers() {
+    return _db.collection('users').snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => UserModel.fromMap(d.id, d.data()))
+          .toList();
+      list.sort(
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+      );
+      return list;
+    });
+  }
+
+  /// Adds an available coupon to the reward shop. Admin only. Returns its id.
+  Future<String> addCoupon({
+    required String title,
+    required String description,
+    required int cost,
+    required String code,
+    int stock = 1,
+    List<String>? codes,
+  }) async {
+    if (title.trim().isEmpty) {
+      throw ArgumentError('A coupon needs a title.');
+    }
+    final effectiveCodes = (codes != null && codes.isNotEmpty)
+        ? codes.map((c) => c.trim()).where((c) => c.isNotEmpty).toList()
+        : [code.trim()];
+    if (effectiveCodes.isEmpty || effectiveCodes.every((c) => c.isEmpty)) {
+      throw ArgumentError('A coupon needs at least one code.');
+    }
+    if (cost < 0) throw ArgumentError.value(cost, 'cost', 'Cannot be negative.');
+    final effectiveStock = stock > 0 ? stock : effectiveCodes.length;
+    final primaryCode = code.trim().isNotEmpty ? code.trim() : effectiveCodes.first;
+
+    final doc = _couponsRef.doc();
+    await doc.set(
+      CouponModel(
+        id: doc.id,
+        title: title.trim(),
+        description: description.trim(),
+        cost: cost,
+        code: primaryCode,
+        available: effectiveStock > 0,
+        stock: effectiveStock,
+        codes: effectiveCodes,
+      ).toMap(),
+    );
+    return doc.id;
+  }
+
+  /// Deletes a coupon. Admin only.
+  Future<void> removeCoupon(String couponId) async {
+    await _couponsRef.doc(couponId).delete();
+  }
+
+  /// Streams all reports across all statuses, for admin statistics.
+  /// Admin only. Never reads `reportPhotos`.
+  Stream<List<ReportModel>> watchAllReports() {
+    return _reportsRef.snapshots().map(
+      (snap) => snap.docs
+          .map((d) => ReportModel.fromMap(d.id, d.data()))
+          .toList(),
+    );
+  }
+
   /// Streams all valid/approved reports for the risk map.
   /// Never reads `reportPhotos`.
   Stream<List<ReportModel>> watchValidReports() {
@@ -170,16 +307,21 @@ class FirestoreService {
   // Part B: Rewards & Redemptions
   // ==========================================
 
-  /// Streams available coupons for the reward shop
+  /// Streams coupons for the reward shop (both in-stock and out-of-stock items)
   Stream<List<CouponModel>> watchAvailableCoupons() {
     return _couponsRef
-        .where('available', isEqualTo: true)
         .snapshots()
         .map((snap) {
           final list = snap.docs
               .map((d) => CouponModel.fromMap(d.id, d.data()))
               .toList();
-          list.sort((a, b) => a.cost.compareTo(b.cost));
+          // Sort by stock status (in-stock first), then by cost
+          list.sort((a, b) {
+            if (a.hasStock != b.hasStock) {
+              return a.hasStock ? -1 : 1;
+            }
+            return a.cost.compareTo(b.cost);
+          });
           return list;
         });
   }
@@ -199,6 +341,7 @@ class FirestoreService {
   }
 
   /// Atomically redeems a coupon for a user.
+  /// Supports both multi-code pool (with stock) and single-code legacy coupons.
   Future<String> redeemCoupon({
     required String uid,
     required CouponModel coupon,
@@ -220,13 +363,40 @@ class FirestoreService {
       }
 
       final couponSnapshot = await transaction.get(couponDocRef);
-      if (couponSnapshot.exists) {
-        final cData = couponSnapshot.data()!;
-        final isAvailable = cData['available'] is bool ? cData['available'] as bool : true;
-        if (!isAvailable) {
-          throw Exception('coupon_already_redeemed');
-        }
+      if (!couponSnapshot.exists) {
+        throw Exception('coupon_not_found');
       }
+
+      final cData = couponSnapshot.data()!;
+      final isAvailable = cData['available'] is bool ? cData['available'] as bool : true;
+      if (!isAvailable) {
+        throw Exception('coupon_already_redeemed');
+      }
+
+      // Check stock and codes array if present
+      final rawCodes = cData['codes'];
+      List<String> poolCodes = [];
+      if (rawCodes is List) {
+        poolCodes = rawCodes.map((e) => e.toString()).toList();
+      }
+
+      int currentStock = (cData['stock'] as num?)?.toInt() ??
+          (poolCodes.isNotEmpty ? poolCodes.length : 1);
+
+      if (currentStock <= 0) {
+        throw Exception('coupon_already_redeemed');
+      }
+
+      // Determine which code to assign
+      String codeToIssue;
+      if (poolCodes.isNotEmpty) {
+        codeToIssue = poolCodes.removeAt(0); // Pop first code
+      } else {
+        codeToIssue = cData['code'] as String? ?? coupon.code;
+      }
+
+      final newStock = currentStock - 1;
+      final stillAvailable = newStock > 0 && (poolCodes.isEmpty ? newStock > 0 : poolCodes.isNotEmpty);
 
       // 1. Deduct points
       final newPoints = currentPoints - coupon.cost;
@@ -235,11 +405,16 @@ class FirestoreService {
         'pointsBalance': newPoints,
       });
 
-      // 2. Mark coupon as unavailable
-      transaction.update(couponDocRef, {
-        'available': false,
-        'status': 'redeemed',
-      });
+      // 2. Update coupon stock and available status
+      final Map<String, dynamic> couponUpdates = {
+        'stock': newStock,
+        'available': stillAvailable,
+        'status': stillAvailable ? 'available' : 'redeemed',
+      };
+      if (rawCodes is List) {
+        couponUpdates['codes'] = poolCodes;
+      }
+      transaction.update(couponDocRef, couponUpdates);
 
       // 3. Add to redemptions collection
       final newRedemptionRef = _redemptionsRef.doc();
@@ -247,7 +422,7 @@ class FirestoreService {
         id: newRedemptionRef.id,
         uid: uid,
         couponId: coupon.id,
-        code: coupon.code,
+        code: codeToIssue,
         title: coupon.title,
         description: coupon.description,
         cost: coupon.cost,
@@ -255,7 +430,7 @@ class FirestoreService {
       );
       transaction.set(newRedemptionRef, redemption.toMap());
 
-      return coupon.code;
+      return codeToIssue;
     });
   }
 }

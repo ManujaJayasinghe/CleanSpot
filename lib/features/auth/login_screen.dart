@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../app/session.dart';
 import '../../app/theme_proposal.dart';
 import '../../services/firestore_service.dart';
 
 /// CleanSpot Login & Registration screen matching the design mockup.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.blocked = false});
+
+  /// True when the user was just signed out because the account is blocked.
+  final bool blocked;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -21,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _loading = false;
   bool _obscurePassword = true;
-  String? _error;
+  late String? _error = widget.blocked ? kBlockedMessage : null;
 
   @override
   void dispose() {

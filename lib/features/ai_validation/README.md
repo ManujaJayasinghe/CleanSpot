@@ -3,9 +3,9 @@
 Checks whether a report photo shows a possible dengue mosquito breeding site,
 using Gemini through Firebase AI Logic (Gemini Developer API).
 
-The feature is complete: live camera photo and GPS, the AI check, the duplicate
-check, the decision, and the Report screen, which saves the result and awards
-points (see "Saving the result").
+The feature is complete: live camera photo and GPS, the AI check, the
+"still present" check, the decision, and the Report screen, which saves the
+result and awards points (see "Saving the result").
 
 Settings live in `ai_config.dart`: model `kAiModelName`, request timeout
 `kAiRequestTimeout` (30 s) and minimum confidence `kMinConfidence` (0.7). The
@@ -21,27 +21,34 @@ GPS limit is `CaptureResult.maxAccuracyMeters` (50 m).
 | `validation_result.dart` | `ValidationResult` and `SiteCategory`. |
 | `capture_service.dart` | `captureReportPhoto()`: live camera photo plus a GPS fix. |
 | `capture_result.dart` | `CaptureResult` (photo + GPS, or why it failed). |
-| `duplicate_check.dart` | `isDuplicate(lat, lng)`: is there a valid report within 20 m from the last 7 days? See "Duplicate check". |
+| `duplicate_check.dart` | `findStillPresentReport(lat, lng)`: the id of a valid report within 50 m active in the last 14 days, or null. See "Still present rule". |
 | `geohash.dart` | `encode(lat, lng, precision)`, `bounds(hash)`, `neighbours(hash)` (the 8 surrounding cells). No package. |
 | `haversine.dart` | `haversineMeters(lat1, lng1, lat2, lng2)`. |
-| `report_decision.dart` | `decide(ai, capture, isDuplicate)`: the eligibility rule. |
-| `report_check_controller.dart` | Runs validatePhoto, then the duplicate check, then `decide()`. |
+| `report_decision.dart` | `decide(ai, capture, existingReportId)`: approved, still present or rejected. |
+| `report_check_controller.dart` | Runs validatePhoto, then the still-present check, then `decide()`. |
 | `report_outcome.dart` | `ReportOutcome` and the `onDecision` callback type. |
 | `dev_live_test.dart` | Debug-only live test (see Testing). |
 
 ## How the Report screen uses it
 
 The whole flow lives in `lib/features/report/report_screen.dart` (form, checking,
-approved, rejected). Submit is enabled only after a live camera photo with a
+approved, still present, rejected). Submit is enabled only after a live camera photo with a
 valid GPS fix (within 50 m). Then:
 
 1. **Checking:** `ReportCheckController.check()` runs. The screen shows real
-   progress. If the check itself fails (network, quota, App Check, duplicate
-   lookup error) the user gets **Try again / Retake photo**; nothing is
+   progress. If the check itself fails (network, quota, App Check, the
+   still-present lookup) the user gets **Try again / Retake photo**; nothing is
    approved on an error.
-2. **Approved** or **Rejected** is decided by `decide()`. A report is eligible
-   only if the AI says it is a breeding site with confidence of at least 0.7,
-   the photo does not look fake, it is not a duplicate, and GPS is within 50 m.
+2. `decide()` gives one of three results. A photo **passes** only if the AI
+   says it is a breeding site with confidence of at least 0.7, the photo does
+   not look fake, and GPS is within 50 m.
+   - **Approved:** it passes and no valid report covers this spot. A new report
+     is saved and earns points.
+   - **Still present:** it passes, but a valid report already covers this spot
+     (see "Still present rule"). That report is updated; the user sees "Thanks,
+     this site is already reported. We've marked it as still present."
+   - **Rejected:** it does not pass. This is checked first, so a failing photo
+     never marks a site as still present.
 
 ## Saving the result (reports, photo and points)
 
@@ -54,18 +61,23 @@ and is written in **one write batch**, so it all happens or none of it does:
 |---|---|---|---|
 | **Approved** (`status: 'valid'`) | yes | yes (the only place the photo is stored) | `+10` (`kPointsPerValidReport`) on `pointsBalance` and `points` |
 | **Rejected** (`status: 'rejected'`) | yes (AI fields and geohash included) | **no** | **no** |
+| **Still present** | **no new report**; the existing one gets `confirmationCount + 1`, `lastConfirmedAt` (server time) and `lastConfirmationId` | **no** | **no** |
 
 - The `reports` document never contains the photo (no `imageUrl` / `photoUrl`).
   Anything that shows a photo loads it for that one report with
   `FirestoreService.getReportPhoto(reportId)` (cached; placeholder while loading
-  or if missing). Lists, the map and the duplicate check read `reports` only; a
+  or if missing). Lists, the map and the still-present check read `reports` only; a
   test (`test/services/report_photos_access_test.dart`) fails if that changes.
 - `type` and `aiCategory` are saved as wire values (`stagnant_water`, `tire`,
   `blocked_drain`, `container`, `other`, `none`). Older documents with enum names
   (`blockedDrain`) are converted when read.
 - `createdAt` is the server's time; `geohash` is `encode(lat, lng, 9)` from
-  `geohash.dart`, so the duplicate check can find the report.
-- `confirmationCount` is for community "still there" confirmations, not a gate.
+  `geohash.dart`, so the still-present check can find the report.
+- `confirmationCount` counts "still present" confirmations
+  (`FirestoreService.markReportStillPresent`). It runs in a transaction that
+  reads the report from the server; if the report already has this
+  confirmation's `lastConfirmationId` (an earlier attempt whose reply was lost),
+  it writes nothing, so Retry never counts twice.
 
 **Failures.** `submitReport` never swallows an error. If saving fails the
 Approved view shows "Couldn't save your report" with **Retry** (re-runs only the
@@ -94,27 +106,39 @@ contains:
   `capture.accuracyMeters`: the live photo and GPS fix
 - `validation.category`, `validation.confidence`, `validation.reason`,
   `validation.looksFake`: the AI result
-- `isDuplicate`, `decision.eligible`, `decision.reason`, `checkedAt`
+- `existingReportId` (set when the site was already reported),
+  `decision.kind`, `decision.eligible`, `decision.isStillPresent`,
+  `decision.reason`, `checkedAt`
 
 Do not save the report again from this callback: the screen already does.
 
-## Duplicate check
+## Still present rule
 
-`isDuplicate(lat, lng)` in `duplicate_check.dart`:
+From the proposal: a site reported again within about 50 m and 14 days is a
+"still present" update, not a new report. This applies to **any user**, so a
+site always has one report, and a second account cannot earn points for it.
+
+`findStillPresentReport(lat, lng)` in `duplicate_check.dart`:
 
 1. Takes the precision-6 geohash of the point (a cell about 1.2 km x 0.6 km)
-   and its 8 neighbours. Together they always cover the 20 m radius.
+   and its 8 neighbours. Together they always cover the 50 m radius.
 2. Runs one range query per cell on `reports`, in parallel:
    `orderBy('geohash').startAt([prefix]).endAt([prefix + '\uf8ff'])`. Reads
    come from the **server only**. Offline, the queries fail; they do not
    silently use the cache.
-3. Filters the results on the phone (`matchesDuplicate`): `status ==
-   'valid'`, `createdAt` within the last 7 days, and Haversine distance
-   ≤ 20 m from `location`. Documents missing `createdAt` or `location` are
-   ignored.
-4. Returns true if anything matches. If any query fails it **throws**, and the
-   check controller shows the retryable error. A failed lookup is never treated
-   as "not a duplicate".
+3. Filters the results on the phone (`matchDistance`): `status == 'valid'`,
+   last activity (the later of `createdAt` and `lastConfirmedAt`) within the
+   last 14 days, and Haversine distance ≤ 50 m from `location`. Documents
+   missing timestamps or `location` are ignored. Because confirmations count as
+   activity, a site that keeps being confirmed stays one report.
+4. Returns the id of the **nearest** match, or null for a new site. If any query
+   fails it **throws**, and the check controller shows the retryable error. A
+   failed lookup is never treated as "new site".
+
+The radius and window are `stillPresentRadiusMeters` and `stillPresentWindow`.
+Only `'valid'` reports match, so a report whose status is changed later (for
+example cleared by an authority) no longer matches, and a new photo there
+becomes a new report.
 
 Only a single-field index on `geohash` is needed, which Firestore creates
 automatically. Status and date are filtered on the phone, so no composite index
@@ -139,11 +163,11 @@ flutter run --dart-define=DEMO_CONTROLS=true
   and a failed save as `Saving the report failed: <error>`
   (`adb logcat -d | grep -E "Report check failed|Saving the report failed"`).
   Nothing else is logged.
-- **The duplicate check is location-based only.** Photos are never compared. A
-  second report within 20 m of a valid report from the last 7 days is
-  rejected, even from another user or another angle. Two different sites less
-  than 20 m apart count as one. GPS may be off by up to 50 m, so two reports of
-  the same site can occasionally both be approved.
+- **The still-present rule is location-based only.** Photos are never
+  compared. Any passing photo within 50 m of a valid report active in the last
+  14 days marks that report as still present, from any user and any angle.
+  Two different sites less than 50 m apart count as one. GPS may be off by up
+  to 50 m, so two reports of the same site can occasionally both be approved.
 - The checks run on the phone, so a determined user could bypass them. That is
   acceptable for this coursework project; real enforcement would need Firestore
   rules or a server function.
@@ -158,9 +182,10 @@ flutter run --dart-define=DEMO_CONTROLS=true
     App Check > Apps, with the app's SHA-256 signing fingerprint. Without it,
     every AI check in a release build fails.
 - **Firestore rules:** signed-in users must be able to read `reports` (for the
-  duplicate check) and write `reports`, `reportPhotos` and their own points.
+  still-present check), update other users' reports (for still-present
+  confirmations; the current rules allow this) and write `reports`, `reportPhotos` and their own points.
   If reads are denied, every check ends on **Try again**.
-- **Indexes:** none to add (see "Duplicate check").
+- **Indexes:** none to add (see "Still present rule").
 
 ## Testing
 
@@ -244,7 +269,10 @@ really WebP; the app rejects those ("The photo could not be read"). Check with
    **Approved** and +10 points. In Firestore, the new `reports` document has a
    9-character `geohash`, `status: "valid"` and a server `createdAt`, and
    `reportPhotos/{id}` exists.
-2. Report again within 20 m. Expect **Rejected** as a duplicate, with no points.
+2. Report again within 50 m (same or another account). Expect **Site Already
+   Reported** with "Thanks, this site is already reported. We've marked it as
+   still present.", no new `reports` document, no points, and the existing
+   report's `confirmationCount` up by 1 with a new `lastConfirmedAt`.
 3. Photograph something unrelated (a clean desk, a selfie). Expect **Rejected**
    as not a breeding site.
 4. Turn on airplane mode and submit. Expect **Try again**; nothing is saved.

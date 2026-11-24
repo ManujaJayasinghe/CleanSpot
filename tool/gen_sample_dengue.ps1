@@ -1,4 +1,4 @@
-# Generates assets/data/dengue_stats_sample.csv: SYNTHETIC placeholder data
+# Generates assets/data/dengue_stats_sample_fallback.csv: SYNTHETIC placeholder data
 # (NOT real statistics) so the Analysis screen runs before Anushka's real CSV
 # arrives. Re-run from the project root: powershell -File tool/gen_sample_dengue.ps1
 $rand = New-Object System.Random 42
@@ -24,7 +24,7 @@ foreach ($name in $districts.Keys) {
     }
   }
 }
-$out = Join-Path (Get-Location) 'assets\data\dengue_stats_sample.csv'
+$out = Join-Path (Get-Location) 'assets\data\dengue_stats_sample_fallback.csv'
 New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
 [IO.File]::WriteAllLines($out, $lines)
 Write-Output "Wrote $($lines.Count - 1) rows to $out"

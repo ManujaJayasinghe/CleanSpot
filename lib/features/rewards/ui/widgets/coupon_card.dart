@@ -18,7 +18,8 @@ class CouponCard extends StatelessWidget {
     this.icon = Icons.local_offer_outlined,
   });
 
-  bool get canRedeem => userPoints >= coupon.cost;
+  bool get hasStock => coupon.stock > 0 && coupon.available;
+  bool get canRedeem => hasStock && userPoints >= coupon.cost;
 
   @override
   Widget build(BuildContext context) {
@@ -34,19 +35,62 @@ class CouponCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Mint icon box
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: const Color(0xFF1B5E3B),
-            ),
+          // Top Row: Mint icon box & Stock Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: const Color(0xFF1B5E3B),
+                ),
+              ),
+              if (coupon.stock > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: coupon.stock <= 3
+                        ? const Color(0xFFFFF3E0)
+                        : const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${coupon.stock} left',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: coupon.stock <= 3
+                          ? const Color(0xFFE65100)
+                          : const Color(0xFF1B5E3B),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Out of stock',
+                    style: TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFC62828),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
 
@@ -111,7 +155,9 @@ class CouponCard extends StatelessWidget {
                 ),
               ),
               child: Text(
-                canRedeem ? 'Redeem' : 'Not enough points',
+                !hasStock
+                    ? 'Out of stock'
+                    : (canRedeem ? 'Redeem' : 'Not enough points'),
                 style: TextStyle(
                   fontFamily: AppTypography.fontFamily,
                   fontSize: canRedeem ? 14 : 11,
