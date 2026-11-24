@@ -1,7 +1,7 @@
 # CleanSpot Test Results
 
 **Project:** CleanSpot  
-**Date:** 24 November 2026
+**Date:** 25 November 2026
 
 ---
 
@@ -9,34 +9,32 @@
 
 ### 1.1 Flutter Tests
 
-The following command was executed:
+The following commands were executed on 25 November 2026 with Flutter 3.47.0, on the latest `main` (including the merged Home screen, report location map, app logo and Maps key changes) plus the stock photo removal:
 
 ```bash
+flutter analyze
 flutter test
 ```
+
+#### Static Analysis
+
+| Command | Result |
+|---|---|
+| `flutter analyze` | No issues found. |
 
 #### Test Summary
 
 | Metric | Result |
 |---|---:|
-| Total test files | 19 |
-| Total tests | 230 |
-| Passed tests | 229 |
-| Failed tests | 1 |
+| Total test files | 26 |
+| Total tests | 273 |
+| Passed tests | 273 |
+| Failed tests | 0 |
+| Skipped tests | 0 |
 
-#### Failed Test Details
+**Result:** All 273 tests passed, with no failures and none skipped.
 
-| Item | Details |
-|---|---|
-| Test File | `test/app/session_test.dart` |
-| Test Name | `SessionNotifier signing in is not ready until the profile arrives` |
-| Expected Result | `/admin` |
-| Actual Result | `/home` |
-| Status | Failed |
-
-**Result:** 229 tests passed, and 1 test failed.
-
-The failed test is documented for further investigation. No application source code changes were made as part of this documentation task.
+The earlier failure in `test/app/session_test.dart` (`SessionNotifier signing in is not ready until the profile arrives`) was fixed when the Home screen changes were merged; the test now expects the `/home` landing route and passes.
 
 ### 1.2 Automated Test Coverage
 
@@ -65,12 +63,12 @@ The following environment requirements were checked:
 
 | Requirement | Installed Version / Status |
 |---|---|
-| Node.js | v22.22.3 |
-| npm | 10.9.8 |
-| Java | 24.0.2 |
-| Firebase CLI | Not available |
+| Node.js | v26.13.1 |
+| npm | 11.20.0 |
+| Java | OpenJDK 21.0.13 |
+| Firebase CLI | 15.31.0 |
 
-The commands required to execute the Firestore Rules tests are:
+The commands used to execute the Firestore Rules tests were:
 
 ```bash
 cd firestore-rules-test
@@ -78,9 +76,19 @@ npm install
 npm test
 ```
 
-**Test Result:** Not Run.
+They ran against the Firestore emulator using the `firestore.rules` and `rules.test.mjs` committed on `main`.
 
-**Reason:** The Firebase CLI was not available in the environment. Therefore, the Firestore Security Rules tests were not executed.
+| Metric | Result |
+|---|---:|
+| Test suites | 7 |
+| Total tests | 58 |
+| Passed tests | 58 |
+| Failed tests | 0 |
+| Skipped tests | 0 |
+
+**Test Result:** All 58 Firestore Security Rules tests passed.
+
+The emulator log contains `PERMISSION_DENIED` lines. These are expected: they are the requests that the negative test cases (for example a blocked user trying to redeem a coupon) deliberately send to confirm the rules reject them.
 
 ---
 
