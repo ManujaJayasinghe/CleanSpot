@@ -80,3 +80,6 @@ flutter:
     # high-waste periods) and dengue_stats_sample_fallback.csv (synthetic, used
     # ONLY if dengue_stats.csv is missing). See docs/ANALYSIS_DATA.md.
     - assets/data/
+    # CleanSpot logo (shown on the login screen). The Android launcher icons are
+    # generated from the same artwork by tool/generate_logo_assets.dart.
+    - assets/images/
