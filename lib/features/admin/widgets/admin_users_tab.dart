@@ -133,7 +133,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               return ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: filteredUsers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final user = filteredUsers[index];
                   return _UserCard(
@@ -193,42 +193,44 @@ class _UserCard extends StatelessWidget {
             'Change Role',
             style: AppTypography.heading.copyWith(fontSize: 18),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Select role for ${user.displayName.isNotEmpty ? user.displayName : user.uid}:',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              for (final role in kUserRoles)
-                RadioListTile<String>(
-                  title: Text(
-                    role.toUpperCase(),
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: _roleColor(role),
-                    ),
-                  ),
-                  subtitle: Text(
-                    role == kRoleAdmin
-                        ? 'Full admin access to dashboard & users'
-                        : role == kRoleAuthority
-                            ? 'Can verify and clear dengue hotspots'
-                            : 'Standard community user',
-                    style: AppTypography.caption,
-                  ),
-                  value: role,
-                  groupValue: selectedRole,
-                  activeColor: AppColors.primary,
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() => selectedRole = val);
-                    }
-                  },
+          content: RadioGroup<String>(
+            groupValue: selectedRole,
+            onChanged: (val) {
+              if (val != null) {
+                setDialogState(() => selectedRole = val);
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select role for ${user.displayName.isNotEmpty ? user.displayName : user.uid}:',
+                  style: AppTypography.body.copyWith(color: AppColors.textSecondary),
                 ),
-            ],
+                const SizedBox(height: 12),
+                for (final role in kUserRoles)
+                  RadioListTile<String>(
+                    title: Text(
+                      role.toUpperCase(),
+                      style: AppTypography.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: _roleColor(role),
+                      ),
+                    ),
+                    subtitle: Text(
+                      role == kRoleAdmin
+                          ? 'Full admin access to dashboard & users'
+                          : role == kRoleAuthority
+                              ? 'Can verify and clear dengue hotspots'
+                              : 'Standard community user',
+                      style: AppTypography.caption,
+                    ),
+                    value: role,
+                    activeColor: AppColors.primary,
+                  ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
