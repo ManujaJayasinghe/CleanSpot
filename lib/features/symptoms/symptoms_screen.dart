@@ -305,7 +305,9 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
       hoverColor: Colors.transparent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        height: 44,
+        width: double.infinity,
+        height: 52,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -314,17 +316,13 @@ class _SymptomsScreenState extends State<SymptomsScreen> {
             width: selected ? 1.5 : 1,
           ),
         ),
-        child: Center(
-          widthFactor: 1,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.button,
-            ),
-          ),  
-          
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.button,
+          ),
         ),
       ),
     );
