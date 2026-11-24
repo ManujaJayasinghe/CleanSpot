@@ -30,6 +30,10 @@ Stores user profile and gamification balance data.
 | `pointsBalance` | `int` | Current balance of points accumulated by the user. Also written as `points` (the app reads `points` first, so both are always updated together). |
 | `points` | `int` | Same value as `pointsBalance`. |
 | `createdAt` | `timestamp` | Timestamp when the user account was registered. |
+| `role` | `string` (optional) | `'user'` (default), `'admin'` or `'authority'`. A missing or unknown value is read as `'user'`. Decides where the user lands after login (`/home`, `/admin`, `/authority`). Only an admin can change it, in the Firebase console or with `FirestoreService.setUserRole`. |
+| `blocked` | `bool` (optional) | `true` blocks the account: the app signs the user out ("Your account has been blocked. Contact support.") and the security rules refuse everything they try to save. A missing value means not blocked. Only an admin can change it (`FirestoreService.setUserBlocked`). |
+
+**Roles.** `'user'` is a normal account. `'authority'` can mark valid reports as cleared. `'admin'` can do that too, and can also manage users (role, blocked) and coupons. The role is read from this document after login; `firestore.rules` is what actually enforces it, so it cannot be changed from the app by the user themselves.
 
 **How points change:** saving a report with status `'valid'` adds 10 points (`FieldValue.increment(10)` on both `pointsBalance` and `points`, defined once as `kPointsPerValidReport` in `lib/services/report_write_plan.dart`) in the **same write batch** as the report and its photo. Redeeming a coupon subtracts the coupon cost. Rejected reports add nothing.
 
@@ -48,6 +52,8 @@ Stores reports of potential mosquito-breeding sites submitted by community membe
 > - **`'rejected'`**: only `reports/{id}` (with the AI fields and geohash). No `reportPhotos` document and no points.
 >
 > A failed save is reported to the user (nothing is saved and no points are added), and Retry reuses the same `reportId`, so a retry cannot create a second report or award points twice.
+>
+> **Clearing.** `FirestoreService.markReportCleared(reportId)` (authority or admin only) sets `status: 'cleared'`, `clearedBy` and `clearedAt` and **deletes `reportPhotos/{id}`** in one batch. The report document stays.
 
 - **Document ID**: Auto-generated unique ID (`reportId`)
 
@@ -63,7 +69,9 @@ Stores reports of potential mosquito-breeding sites submitted by community membe
 | `lat` | `double` | Latitude coordinate. |
 | `lng` | `double` | Longitude coordinate. |
 | `geohash` | `string` | Geohash string computed from location for proximity queries. |
-| `status` | `string` | `'valid'` (AI approved, automatic) or `'rejected'` (AI did not approve). `'pending'` is not used by the AI flow. Only `'valid'` reports count for the map and the still-present check. |
+| `status` | `string` | `'valid'` (AI approved, automatic), `'rejected'` (AI did not approve) or `'cleared'` (an authority or admin marked the site as dealt with). `'pending'` is not used by the AI flow. **Only `'valid'` reports count for the map and the still-present check**, so a cleared report leaves the map and a new photo at that spot creates a new report. Only a `'valid'` report can become `'cleared'`. |
+| `clearedBy` | `string` (optional) | UID of the authority or admin who cleared the report. Only on `'cleared'` reports. |
+| `clearedAt` | `timestamp` (optional) | Server time when the report was cleared. Only on `'cleared'` reports. |
 | `confirmationCount` | `int` | Number of "still present" confirmations: a passing photo from any user within 50 m and 14 days of this report adds one instead of creating a new report. |
 | `createdAt` | `timestamp` | Timestamp when the report was submitted. |
 | `lastConfirmedAt` | `timestamp` | Server time of the last "still present" confirmation (the creation time until then). |
@@ -76,7 +84,7 @@ Stores reports of potential mosquito-breeding sites submitted by community membe
 
 ## 3. `reportPhotos` Collection
 
-The only place a report photo is stored, kept separate from `reports` to ensure minimal egress and instant map/list querying without downloading image bytes. Only `'valid'` reports have a document here.
+The only place a report photo is stored, kept separate from `reports` to ensure minimal egress and instant map/list querying without downloading image bytes. Only `'valid'` reports have a document here, and it is deleted when the report is cleared.
 
 - **Document ID**: Same ID as the associated report (`reportId`)
 
@@ -127,3 +135,21 @@ Stores atomic records of redeemed coupons.
 | `description` | `string` | Snapshot of coupon description. |
 | `cost` | `int` | Points deducted for the redemption. |
 | `redeemedAt` | `timestamp` | Timestamp when the redemption occurred. |
+
+---
+
+## Security rules (`firestore.rules`)
+
+The rules look up the caller's `users/{uid}` document for `role` and `blocked`. A blocked user counts as signed in but can do nothing but read. Summary:
+
+| Collection | Who can do what |
+|---|---|
+| `users` | An owner reads and edits their own document, **except** `role`, `blocked` and points. Points can only change by the +10 save-a-valid-report increment (both fields) or by lowering both to the same smaller value when redeeming a coupon. A new user can only create their own document as a normal, unblocked user with 0 points. An admin can read every user and change only `role` and `blocked`. Nobody can delete a user. |
+| `reports` | Any signed-in user reads. An active (not blocked) user creates their own report with status `'valid'` or `'rejected'`. Only an authority or admin can update a report, and only to change a `'valid'` report to `'cleared'` (with `clearedBy` and `clearedAt`). Any active user can add a "still present" confirmation (`confirmationCount` +1, `lastConfirmedAt`, `lastConfirmationId`) to a valid report. Nobody can delete. |
+| `reportPhotos` | A signed-in user reads one photo by id (never lists). Only the owner of the report creates it. Only an authority or admin deletes it. No updates. |
+| `coupons` | A signed-in user reads. Only an admin creates, deletes or edits freely. Any active user can redeem (set `available` to false and `status` to `'redeemed'`, nothing else). |
+| `redemptions` | A user reads and creates their own only. |
+
+**Making an account admin:** Firebase console → Firestore Database → `users` → open the document whose ID is the account's UID (Authentication → Users shows it) → Add field `role` (string) = `admin`. The console is not limited by the rules. The app picks the change up live.
+
+The rules are tested in `firestore-rules-test/` (see its README).
