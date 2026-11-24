@@ -6,19 +6,24 @@ import '../../models/report_model.dart';
 import '../../services/firestore_service.dart';
 import 'risk_map_view.dart';
 
-/// A fixed-height card on the Home page showing the same live risk map as the
-/// Map tab ([RiskMapView], heatmap, last 7 days).
+/// A card on the Home page showing the same live risk map as the Map tab
+/// ([RiskMapView], heatmap, last 7 days).
 ///
 /// The preview is not interactive: it never pans or zooms, so it cannot fight
 /// the page scroll. Tapping anywhere on the card, or its "Open full map" chip,
 /// opens the full Map tab (`/map`, the same call the bottom navigation uses).
 class RiskMapPreview extends StatefulWidget {
-  const RiskMapPreview({super.key, this.reports, this.height = 300});
+  const RiskMapPreview({super.key, this.reports, this.height});
 
   /// Report stream override, for tests. Defaults to the live valid reports.
   final Stream<List<ReportModel>>? reports;
 
-  final double height;
+  /// Fixed height. Null fills the space the parent gives it (for example an
+  /// `Expanded`); in an unbounded parent, such as a plain scroll view, it falls
+  /// back to [fallbackHeight].
+  final double? height;
+
+  static const double fallbackHeight = 300;
 
   @override
   State<RiskMapPreview> createState() => _RiskMapPreviewState();
@@ -37,11 +42,24 @@ class _RiskMapPreviewState extends State<RiskMapPreview> {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height =
+            widget.height ??
+            (constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : RiskMapPreview.fallbackHeight);
+        return _card(height);
+      },
+    );
+  }
+
+  Widget _card(double height) {
     return Semantics(
       button: true,
       label: 'Risk map preview. Open full map',
       child: Container(
-        height: widget.height,
+        height: height,
         width: double.infinity,
         decoration: BoxDecoration(
           color: AppColors.surface,
