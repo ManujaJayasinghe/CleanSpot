@@ -56,7 +56,7 @@ class HomeScreen extends StatelessWidget {
             SliverFillRemaining(
               hasScrollBody: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -115,24 +115,21 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-
-                    // Available points (compact, same style as the Rewards card)
-                    _AvailablePointsCard(stream: pointsStream),
                     const SizedBox(height: 12),
 
-                    // Live risk map preview: takes all the leftover height.
+                    // One green frame: available points on top, the live risk
+                    // map inside it. Takes all the leftover height.
                     Expanded(
-                      child: _MinHeightSlot(
-                        minHeight: minMapHeight,
-                        child: RiskMapPreview(reports: mapReports),
+                      child: _PointsMapFrame(
+                        pointsStream: pointsStream,
+                        mapReports: mapReports,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
                     // "Report a Breeding Site" action button
                     const _ReportButton(),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
 
                     // Recent Reports Section
                     Row(
@@ -144,7 +141,7 @@ class HomeScreen extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: (textTheme.titleLarge ?? AppTypography.heading).copyWith(
-                              fontSize: 20,
+                              fontSize: 17,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
@@ -152,11 +149,17 @@ class HomeScreen extends StatelessWidget {
                         ),
                         TextButton(
                           onPressed: () => context.push('/profile/reports'),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           child: const Text(
                             'View all',
                             style: TextStyle(
                               fontFamily: AppTypography.fontFamily,
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: AppColors.primary,
                             ),
@@ -164,7 +167,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 2),
 
                     // Real latest report card from Firestore
                     LatestReportCard(reports: recentReports),
@@ -179,10 +182,58 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Compact "AVAILABLE POINTS" card in the leaf style of the Rewards balance
-/// card: label, live number and "points" in one row, about 80 px tall.
-class _AvailablePointsCard extends StatelessWidget {
-  const _AvailablePointsCard({this.stream});
+/// The green frame at the top of Home: the "AVAILABLE POINTS" header on top
+/// and the live risk map inside the same [LeafBackground] card, inset by 8 px
+/// so a thin green outline shows around it.
+///
+/// The lighter circle and leaf decorate the header only: the map area has an
+/// opaque green background that covers them below the header. The map keeps a
+/// minimum height of [HomeScreen.minMapHeight] and takes all the leftover
+/// height.
+class _PointsMapFrame extends StatelessWidget {
+  const _PointsMapFrame({this.pointsStream, this.mapReports});
+
+  final Stream<UserModel?>? pointsStream;
+  final Stream<List<ReportModel>>? mapReports;
+
+  @override
+  Widget build(BuildContext context) {
+    return LeafBackground(
+      key: const ValueKey('home-points-map-card'),
+      borderRadius: BorderRadius.circular(24),
+      circleSize: 150,
+      circleTop: -37,
+      circleRight: -48,
+      leafSize: 56,
+      child: Column(
+        children: [
+          _PointsHeader(stream: pointsStream),
+          Expanded(
+            child: ColoredBox(
+              color: LeafBackground.darkGreen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: _MinHeightSlot(
+                  minHeight: HomeScreen.minMapHeight,
+                  child: RiskMapPreview(
+                    reports: mapReports,
+                    standalone: false,
+                    cornerRadius: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "AVAILABLE POINTS" label with the live number and "points" under it, about
+/// 70 px tall.
+class _PointsHeader extends StatelessWidget {
+  const _PointsHeader({this.stream});
 
   final Stream<UserModel?>? stream;
 
@@ -190,15 +241,11 @@ class _AvailablePointsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return LeafBackground(
+    return Padding(
       key: const ValueKey('home-points-card'),
-      borderRadius: BorderRadius.circular(20),
-      circleSize: 150,
-      circleTop: null,
-      circleRight: -48,
-      leafSize: 56,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      child: SizedBox(
+        width: double.infinity,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -212,7 +259,6 @@ class _AvailablePointsCard extends StatelessWidget {
                 letterSpacing: 1.1,
               ),
             ),
-            const SizedBox(height: 2),
             UserPoints(
               stream: stream,
               builder: (context, points) => Row(
@@ -250,72 +296,54 @@ class _AvailablePointsCard extends StatelessWidget {
   }
 }
 
-/// Full-width "Report a Breeding Site" button in the leaf style. A transparent
-/// Material and InkWell sit on top of the decoration, so the ripple shows and
-/// the whole button is tappable.
+/// Full-width "Report a Breeding Site" button: solid [AppColors.primary] with
+/// the ripple from its InkWell.
 class _ReportButton extends StatelessWidget {
   const _ReportButton();
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(18);
-
     return SizedBox(
       height: 56,
       width: double.infinity,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: LeafBackground(
-              borderRadius: radius,
-              circleSize: 120,
-              circleTop: null,
-              circleRight: -34,
-              leafSize: 44,
-              child: const SizedBox.expand(),
-            ),
-          ),
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                key: const ValueKey('home-report-button'),
-                borderRadius: radius,
-                onTap: () => context.go('/report'),
-                // FittedBox: the label shrinks instead of overflowing on a
-                // narrow screen or with very large text.
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.add_circle_outline,
-                            size: 22,
-                            color: AppColors.surface,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Report a Breeding Site',
-                            style: TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.surface,
-                            ),
-                          ),
-                        ],
+      child: Material(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey('home-report-button'),
+          onTap: () => context.go('/report'),
+          // FittedBox: the label shrinks instead of overflowing on a narrow
+          // screen or with very large text.
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 22,
+                      color: AppColors.surface,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Report a Breeding Site',
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.surface,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -429,16 +457,12 @@ class _LatestReportCardState extends State<LatestReportCard> {
             !snapshot.hasData) {
           return Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
+            padding: const EdgeInsets.all(14),
+            decoration: _cardDecoration,
             child: const Center(
               child: SizedBox(
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
@@ -449,20 +473,16 @@ class _LatestReportCardState extends State<LatestReportCard> {
         if (reports.isEmpty) {
           return InkWell(
             onTap: () => context.go('/report'),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border, width: 1),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: _cardDecoration,
               child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 36,
+                    height: 36,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.primaryLight,
@@ -470,10 +490,10 @@ class _LatestReportCardState extends State<LatestReportCard> {
                     child: const Icon(
                       Icons.add_location_alt_outlined,
                       color: AppColors.primaryDark,
-                      size: 22,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,16 +501,15 @@ class _LatestReportCardState extends State<LatestReportCard> {
                         Text(
                           'No reports yet',
                           style: (textTheme.titleMedium ?? AppTypography.heading).copyWith(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
                           'Tap to report your first breeding site.',
                           style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -499,7 +518,7 @@ class _LatestReportCardState extends State<LatestReportCard> {
                   ),
                   const Icon(
                     Icons.arrow_forward_ios,
-                    size: 14,
+                    size: 13,
                     color: AppColors.textSecondary,
                   ),
                 ],
@@ -512,18 +531,18 @@ class _LatestReportCardState extends State<LatestReportCard> {
         final locationText = latest.description.isNotEmpty
             ? latest.description
             : '${latest.lat.toStringAsFixed(4)}° N, ${latest.lng.toStringAsFixed(4)}° E';
+        final detailStyle = (textTheme.bodySmall ?? AppTypography.caption).copyWith(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+        );
 
         return InkWell(
           onTap: () => context.push('/profile/reports'),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: _cardDecoration,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -533,34 +552,33 @@ class _LatestReportCardState extends State<LatestReportCard> {
                     Expanded(
                       child: Text(
                         SiteCategory.labelFor(latest.type),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: (textTheme.titleMedium ?? AppTypography.heading).copyWith(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     StatusChip.fromStatus(
                       text: latest.status,
                       status: latest.status,
+                      compact: true,
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  locationText,
-                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
                 const SizedBox(height: 4),
-                Text(
-                  _formatDate(latest.createdAt),
-                  style: (textTheme.bodySmall ?? AppTypography.caption).copyWith(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                // Coordinates and date share a line when they fit, and wrap
+                // onto a second line when they do not.
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 2,
+                  children: [
+                    Text(locationText, style: detailStyle),
+                    Text(_formatDate(latest.createdAt), style: detailStyle),
+                  ],
                 ),
               ],
             ),
@@ -569,4 +587,10 @@ class _LatestReportCardState extends State<LatestReportCard> {
       },
     );
   }
+
+  static final BoxDecoration _cardDecoration = BoxDecoration(
+    color: AppColors.surface,
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: AppColors.border, width: 1),
+  );
 }
