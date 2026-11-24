@@ -25,6 +25,12 @@ class Insight {
   final String body;
 }
 
+/// How a district name from the data is shown to people. Kalmunai is its own
+/// RDHS in the Epidemiology Unit tables, separate from Ampara; the label only
+/// tells readers where it is.
+String displayDistrictName(String district) =>
+    district == 'Kalmunai' ? 'Kalmunai (Ampara)' : district;
+
 /// Distinct district names, A to Z.
 List<String> districtsOf(List<DengueStat> stats) {
   final names = {for (final s in stats) s.district}.toList()..sort();
@@ -100,6 +106,7 @@ int _monthOfWeek(int week) => (((week - 1) * 7) ~/ 30.44).clamp(0, 11);
 List<Insight> buildInsights(List<DengueStat> stats, String district) {
   final series = weeklySeries(stats, district);
   if (series.isEmpty) return const [];
+  final name = displayDistrictName(district);
 
   final insights = <Insight>[];
 
@@ -108,7 +115,7 @@ List<Insight> buildInsights(List<DengueStat> stats, String district) {
   insights.add(
     Insight(
       title: 'Worst week on record',
-      body: '$district peaked in week ${peak.week} of ${peak.year} with '
+      body: '$name peaked in week ${peak.week} of ${peak.year} with '
           '${peak.cases} cases.',
     ),
   );

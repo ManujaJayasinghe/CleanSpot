@@ -75,7 +75,8 @@ flutter:
   # lib/features/ai_validation/README.md). Photos are git-ignored.
   assets:
     - assets/dev_samples/
-    # Dengue statistics for the Analysis screen. Put Anushka's cleaned CSV
-    # at assets/data/dengue_stats.csv (district,year,week,cases); until
-    # then the synthetic dengue_stats_sample.csv is used.
+    # Data for the Analysis screen: dengue_stats.csv (real Epidemiology Unit
+    # cases, made by tool/extract_dengue.py), waste_periods.csv (sourced
+    # high-waste periods) and dengue_stats_sample_fallback.csv (synthetic, used
+    # ONLY if dengue_stats.csv is missing). See docs/ANALYSIS_DATA.md.
     - assets/data/
