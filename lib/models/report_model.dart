@@ -20,7 +20,7 @@ class ReportModel {
   /// container, other or none (old documents are normalized when read).
   final String type;
   final String description;
-  final String status; // 'pending' | 'valid' | 'rejected'
+  final String status; // 'pending' | 'valid' | 'rejected' | 'cleared'
   final GeoPoint location;
   final String geohash;
   final int confirmationCount;
@@ -31,6 +31,11 @@ class ReportModel {
   final String? aiCategory;
   final double? aiConfidence;
   final String? aiReason;
+
+  /// Set when an authority or admin marks the site as cleared (status
+  /// 'cleared'): who did it and when. Null otherwise.
+  final String? clearedBy;
+  final DateTime? clearedAt;
 
   const ReportModel({
     required this.id,
@@ -50,6 +55,8 @@ class ReportModel {
     this.aiCategory,
     this.aiConfidence,
     this.aiReason,
+    this.clearedBy,
+    this.clearedAt,
   });
 
   factory ReportModel.fromMap(String id, Map<String, dynamic> map) {
@@ -84,6 +91,8 @@ class ReportModel {
       aiCategory: SiteCategory.normalizeStored(map['aiCategory'] as String?),
       aiConfidence: (map['aiConfidence'] as num?)?.toDouble(),
       aiReason: map['aiReason'] as String?,
+      clearedBy: map['clearedBy'] as String?,
+      clearedAt: (map['clearedAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -104,6 +113,8 @@ class ReportModel {
       if (aiCategory != null) 'aiCategory': aiCategory,
       if (aiConfidence != null) 'aiConfidence': aiConfidence,
       if (aiReason != null) 'aiReason': aiReason,
+      if (clearedBy != null) 'clearedBy': clearedBy,
+      if (clearedAt != null) 'clearedAt': Timestamp.fromDate(clearedAt!),
       // Backwards compatibility for existing team code
       'reporterId': uid,
     };
