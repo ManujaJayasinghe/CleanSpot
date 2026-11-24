@@ -62,9 +62,6 @@ class _ReportScreenState extends State<ReportScreen>
   late final AnimationController _scanController;
   late final Animation<double> _scanAnimation;
 
-  final String _samplePhotoUrl =
-      'https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600&auto=format&fit=crop&q=80';
-
   @override
   void initState() {
     super.initState();
@@ -286,7 +283,7 @@ class _ReportScreenState extends State<ReportScreen>
     });
   }
 
-  /// The captured photo, or the sample photo when there is none (demo only).
+  /// The captured photo, or a plain placeholder when there is none.
   Widget _buildPhotoImage(double height) {
     final bytes = _capture?.jpegBytes;
     Widget placeholder() => Container(
@@ -309,13 +306,7 @@ class _ReportScreenState extends State<ReportScreen>
         errorBuilder: (_, _, _) => placeholder(),
       );
     }
-    return Image.network(
-      _samplePhotoUrl,
-      height: height,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => placeholder(),
-    );
+    return placeholder();
   }
 
   /// Coordinates and accuracy of the capture (sample text when demoing).
