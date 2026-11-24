@@ -9,10 +9,7 @@ import '../../../services/firestore_service.dart';
 class AdminUsersTab extends StatefulWidget {
   final FirestoreService firestoreService;
 
-  const AdminUsersTab({
-    super.key,
-    required this.firestoreService,
-  });
+  const AdminUsersTab({super.key, required this.firestoreService});
 
   @override
   State<AdminUsersTab> createState() => _AdminUsersTabState();
@@ -49,16 +46,25 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search users by name, role or UID...',
-              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: AppColors.textSecondary,
+              ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                      icon: const Icon(
+                        Icons.clear,
+                        color: AppColors.textSecondary,
+                      ),
                       onPressed: () => _searchController.clear(),
                     )
                   : null,
               filled: true,
               fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: AppColors.border),
@@ -69,7 +75,10 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -89,7 +98,9 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                     padding: const EdgeInsets.all(24),
                     child: Text(
                       'Error loading users: ${snapshot.error}',
-                      style: AppTypography.body.copyWith(color: AppColors.errorText),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.errorText,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -99,7 +110,9 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               final allUsers = snapshot.data ?? [];
               final filteredUsers = allUsers.where((u) {
                 if (_searchQuery.isEmpty) return true;
-                final nameMatch = u.displayName.toLowerCase().contains(_searchQuery);
+                final nameMatch = u.displayName.toLowerCase().contains(
+                  _searchQuery,
+                );
                 final uidMatch = u.uid.toLowerCase().contains(_searchQuery);
                 final roleMatch = u.role.toLowerCase().contains(_searchQuery);
                 return nameMatch || uidMatch || roleMatch;
@@ -113,7 +126,9 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _searchQuery.isEmpty ? Icons.people_outline : Icons.search_off,
+                          _searchQuery.isEmpty
+                              ? Icons.people_outline
+                              : Icons.search_off,
                           size: 48,
                           color: AppColors.textSecondary,
                         ),
@@ -122,7 +137,9 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                           _searchQuery.isEmpty
                               ? 'No users found.'
                               : 'No users matching "$_searchQuery".',
-                          style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -131,9 +148,12 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 itemCount: filteredUsers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final user = filteredUsers[index];
                   return _UserCard(
@@ -154,10 +174,7 @@ class _UserCard extends StatelessWidget {
   final UserModel user;
   final FirestoreService firestoreService;
 
-  const _UserCard({
-    required this.user,
-    required this.firestoreService,
-  });
+  const _UserCard({required this.user, required this.firestoreService});
 
   Color _roleColor(String role) {
     switch (role) {
@@ -188,7 +205,9 @@ class _UserCard extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Change Role',
             style: AppTypography.heading.copyWith(fontSize: 18),
@@ -199,35 +218,44 @@ class _UserCard extends StatelessWidget {
             children: [
               Text(
                 'Select role for ${user.displayName.isNotEmpty ? user.displayName : user.uid}:',
-                style: AppTypography.body.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
-              for (final role in kUserRoles)
-                RadioListTile<String>(
-                  title: Text(
-                    role.toUpperCase(),
-                    style: AppTypography.body.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: _roleColor(role),
-                    ),
-                  ),
-                  subtitle: Text(
-                    role == kRoleAdmin
-                        ? 'Full admin access to dashboard & users'
-                        : role == kRoleAuthority
-                            ? 'Can verify and clear dengue hotspots'
-                            : 'Standard community user',
-                    style: AppTypography.caption,
-                  ),
-                  value: role,
-                  groupValue: selectedRole,
-                  activeColor: AppColors.primary,
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() => selectedRole = val);
-                    }
-                  },
+              RadioGroup<String>(
+                groupValue: selectedRole,
+                onChanged: (val) {
+                  if (val != null) {
+                    setDialogState(() => selectedRole = val);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final role in kUserRoles)
+                      RadioListTile<String>(
+                        title: Text(
+                          role.toUpperCase(),
+                          style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: _roleColor(role),
+                          ),
+                        ),
+                        subtitle: Text(
+                          role == kRoleAdmin
+                              ? 'Full admin access to dashboard & users'
+                              : role == kRoleAuthority
+                              ? 'Can verify and clear dengue hotspots'
+                              : 'Standard community user',
+                          style: AppTypography.caption,
+                        ),
+                        value: role,
+                        activeColor: AppColors.primary,
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
           actions: [
@@ -240,7 +268,9 @@ class _UserCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text('Update Role'),
             ),
@@ -254,7 +284,9 @@ class _UserCard extends StatelessWidget {
       if (user.uid == currentUid && newRole != kRoleAdmin) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('You cannot remove the admin role from your own account.'),
+            content: Text(
+              'You cannot remove the admin role from your own account.',
+            ),
             backgroundColor: AppColors.errorText,
           ),
         );
@@ -266,7 +298,9 @@ class _UserCard extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Updated ${user.displayName}\'s role to ${newRole.toUpperCase()}'),
+              content: Text(
+                'Updated ${user.displayName}\'s role to ${newRole.toUpperCase()}',
+              ),
               backgroundColor: AppColors.primaryDark,
             ),
           );
@@ -320,9 +354,13 @@ class _UserCard extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogCtx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: willBlock ? AppColors.errorText : AppColors.primary,
+              backgroundColor: willBlock
+                  ? AppColors.errorText
+                  : AppColors.primary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(willBlock ? 'Block' : 'Unblock'),
           ),
@@ -341,7 +379,9 @@ class _UserCard extends StatelessWidget {
                     ? 'Blocked ${user.displayName.isNotEmpty ? user.displayName : user.uid}'
                     : 'Unblocked ${user.displayName.isNotEmpty ? user.displayName : user.uid}',
               ),
-              backgroundColor: willBlock ? AppColors.errorText : AppColors.primaryDark,
+              backgroundColor: willBlock
+                  ? AppColors.errorText
+                  : AppColors.primaryDark,
             ),
           );
         }
@@ -360,7 +400,9 @@ class _UserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = user.displayName.isNotEmpty ? user.displayName : 'User (${user.uid.substring(0, 6)})';
+    final name = user.displayName.isNotEmpty
+        ? user.displayName
+        : 'User (${user.uid.substring(0, 6)})';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Container(
@@ -377,12 +419,19 @@ class _UserCard extends StatelessWidget {
         leading: Stack(
           children: [
             CircleAvatar(
-              backgroundColor: user.blocked ? AppColors.errorBg : _roleBgColor(user.role),
-              foregroundColor: user.blocked ? AppColors.errorText : _roleColor(user.role),
+              backgroundColor: user.blocked
+                  ? AppColors.errorBg
+                  : _roleBgColor(user.role),
+              foregroundColor: user.blocked
+                  ? AppColors.errorText
+                  : _roleColor(user.role),
               radius: 20,
               child: Text(
                 initial,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
             if (user.blocked)
@@ -472,7 +521,9 @@ class _UserCard extends StatelessWidget {
         ),
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           onSelected: (action) {
             if (action == 'role') {
               _showRoleDialog(context);
@@ -496,15 +547,21 @@ class _UserCard extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    user.blocked ? Icons.lock_open_outlined : Icons.block_outlined,
+                    user.blocked
+                        ? Icons.lock_open_outlined
+                        : Icons.block_outlined,
                     size: 18,
-                    color: user.blocked ? AppColors.primary : AppColors.errorText,
+                    color: user.blocked
+                        ? AppColors.primary
+                        : AppColors.errorText,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     user.blocked ? 'Unblock User' : 'Block User',
                     style: TextStyle(
-                      color: user.blocked ? AppColors.primary : AppColors.errorText,
+                      color: user.blocked
+                          ? AppColors.primary
+                          : AppColors.errorText,
                     ),
                   ),
                 ],

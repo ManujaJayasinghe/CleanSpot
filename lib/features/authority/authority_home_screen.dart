@@ -76,6 +76,8 @@ class AuthorityHomeScreen extends StatefulWidget {
     this.onMarkCleared,
     this.photoLoader,
     this.onSignOut,
+    this.hasMapsApiKey,
+    this.mapsKeyChecker,
   });
 
   final FirestoreService? firestoreService;
@@ -84,6 +86,8 @@ class AuthorityHomeScreen extends StatefulWidget {
   final Future<void> Function(String reportId)? onMarkCleared;
   final Future<Uint8List?> Function(String reportId)? photoLoader;
   final Future<void> Function()? onSignOut;
+  final bool? hasMapsApiKey;
+  final Future<bool> Function()? mapsKeyChecker;
 
   @override
   State<AuthorityHomeScreen> createState() => _AuthorityHomeScreenState();
@@ -101,6 +105,8 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
 
   late final Stream<List<ReportModel>> _validReportsStream;
   late final Stream<List<ReportModel>>? _allReportsStream;
+
+  bool? _hasMapsKey;
 
   MapViewMode _viewMode = MapViewMode.heatmap;
   String? _selectedArea;
@@ -131,6 +137,14 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
       _allReportsStream = _service.watchAllReports();
     } else {
       _allReportsStream = null;
+    }
+    if (widget.hasMapsApiKey != null) {
+      _hasMapsKey = widget.hasMapsApiKey;
+    } else {
+      (widget.mapsKeyChecker ?? checkMapsApiKeyConfigured)().then((hasKey) {
+        if (!mounted) return;
+        setState(() => _hasMapsKey = hasKey);
+      });
     }
   }
 
@@ -462,70 +476,107 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
             child: SizedBox(
               height: 230,
               width: double.infinity,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: _buildInteractiveMapCanvas(mappable),
-                  ),
-                  Positioned(left: 10, bottom: 10, child: _buildLegend()),
-                  Positioned(
-                    right: 10,
-                    bottom: 10,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (mappable.isNotEmpty) ...[
-                          _buildMapControlButton(
-                            icon: Icons.my_location,
-                            tooltip: 'Center on latest report',
-                            onTap: () {
-                              final sorted = [...mappable]
-                                ..sort(
-                                  (a, b) => b.createdAt.compareTo(a.createdAt),
-                                );
-                              _centerOnReport(sorted.first);
-                            },
+              child: _hasMapsKey == false
+                  ? Container(
+                      key: const ValueKey('authority-map-key-not-set'),
+                      color: AppColors.background,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.map_outlined,
+                            size: 28,
+                            color: AppColors.warningText,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
+                          Text(
+                            mapKeyNotSetMessage,
+                            style: AppTypography.heading.copyWith(fontSize: 15),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            mapKeyNotSetHint,
+                            style: AppTypography.caption,
+                            textAlign: TextAlign.center,
+                          ),
                         ],
-                        _buildMapControlButton(
-                          icon: Icons.add,
-                          tooltip: 'Zoom in',
-                          onTap: () => setState(
-                            () => _zoom = (_zoom + 1).clamp(6.0, 18.0),
+                      ),
+                    )
+                  : _hasMapsKey == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : Stack(
+                      children: [
+                        Positioned.fill(
+                          child: _buildInteractiveMapCanvas(mappable),
+                        ),
+                        Positioned(left: 10, bottom: 10, child: _buildLegend()),
+                        Positioned(
+                          right: 10,
+                          bottom: 10,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (mappable.isNotEmpty) ...[
+                                _buildMapControlButton(
+                                  icon: Icons.my_location,
+                                  tooltip: 'Center on latest report',
+                                  onTap: () {
+                                    final sorted = [...mappable]
+                                      ..sort(
+                                        (a, b) =>
+                                            b.createdAt.compareTo(a.createdAt),
+                                      );
+                                    _centerOnReport(sorted.first);
+                                  },
+                                ),
+                                const SizedBox(height: 6),
+                              ],
+                              _buildMapControlButton(
+                                icon: Icons.add,
+                                tooltip: 'Zoom in',
+                                onTap: () => setState(
+                                  () => _zoom = (_zoom + 1).clamp(6.0, 18.0),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              _buildMapControlButton(
+                                icon: Icons.remove,
+                                tooltip: 'Zoom out',
+                                onTap: () => setState(
+                                  () => _zoom = (_zoom - 1).clamp(6.0, 18.0),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        _buildMapControlButton(
-                          icon: Icons.remove,
-                          tooltip: 'Zoom out',
-                          onTap: () => setState(
-                            () => _zoom = (_zoom - 1).clamp(6.0, 18.0),
+                        if (mappable.isEmpty)
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(
+                                  alpha: 0.94,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: const Text(
+                                'All breeding sites cleared — heatmap is cool.',
+                                style: AppTypography.caption,
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
-                  ),
-                  if (mappable.isEmpty)
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface.withValues(alpha: 0.94),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Text(
-                          'All breeding sites cleared — heatmap is cool.',
-                          style: AppTypography.caption,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
             ),
           ),
         ],

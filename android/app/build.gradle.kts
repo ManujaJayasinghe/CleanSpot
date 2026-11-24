@@ -14,7 +14,7 @@ plugins {
 val mapsApiKey: String = Properties().let { props ->
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { props.load(it) }
-    props.getProperty("MAPS_API_KEY", "AIzaSyANLC73Ygb4w3da30nZ3XPE1aPVe-OaCN0")
+    props.getProperty("MAPS_API_KEY", "").trim()
 }
 
 android {
