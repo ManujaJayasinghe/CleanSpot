@@ -40,10 +40,14 @@ class StatusChip extends StatelessWidget {
   final String text;
   final StatusChipType type;
 
+  /// Smaller padding, for dense lists such as the Home screen.
+  final bool compact;
+
   const StatusChip({
     super.key,
     required this.text,
     required this.type,
+    this.compact = false,
   });
 
   /// Factory constructor to construct a chip directly from a status string
@@ -51,11 +55,13 @@ class StatusChip extends StatelessWidget {
     Key? key,
     required String text,
     required String status,
+    bool compact = false,
   }) {
     return StatusChip(
       key: key,
       text: text,
       type: StatusChipType.fromString(status),
+      compact: compact,
     );
   }
 
@@ -88,10 +94,12 @@ class StatusChip extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: compact
+          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 2)
+          : const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(compact ? 8 : 10),
       ),
       child: Text(
         text,

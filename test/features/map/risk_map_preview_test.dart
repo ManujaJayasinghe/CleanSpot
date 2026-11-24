@@ -139,6 +139,42 @@ void main() {
         RiskMapPreview.fallbackHeight);
   });
 
+  testWidgets('standalone: false drops the border and colour, keeps the clip',
+      (tester) async {
+    Future<BoxDecoration> decorationOf(bool standalone) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RiskMapPreview(
+              reports: Stream.value([_report('a')]),
+              height: 300,
+              standalone: standalone,
+              cornerRadius: 16,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      return tester
+          .widget<Container>(
+            find.descendant(
+              of: find.byType(RiskMapPreview),
+              matching: find.byType(Container),
+            ).first,
+          )
+          .decoration! as BoxDecoration;
+    }
+
+    final framed = await decorationOf(true);
+    expect(framed.border, isNotNull);
+    expect(framed.color, isNotNull);
+
+    final bare = await decorationOf(false);
+    expect(bare.border, isNull);
+    expect(bare.color, isNull);
+    expect(bare.borderRadius, BorderRadius.circular(16));
+  });
+
   test('the Profile screen no longer shows the demo-user note', () {
     final profile = File('lib/features/profile/profile_screen.dart')
         .readAsStringSync();

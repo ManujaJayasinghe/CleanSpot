@@ -13,7 +13,13 @@ import 'risk_map_view.dart';
 /// the page scroll. Tapping anywhere on the card, or its "Open full map" chip,
 /// opens the full Map tab (`/map`, the same call the bottom navigation uses).
 class RiskMapPreview extends StatefulWidget {
-  const RiskMapPreview({super.key, this.reports, this.height});
+  const RiskMapPreview({
+    super.key,
+    this.reports,
+    this.height,
+    this.standalone = true,
+    this.cornerRadius = 20,
+  });
 
   /// Report stream override, for tests. Defaults to the live valid reports.
   final Stream<List<ReportModel>>? reports;
@@ -22,6 +28,14 @@ class RiskMapPreview extends StatefulWidget {
   /// `Expanded`); in an unbounded parent, such as a plain scroll view, it falls
   /// back to [fallbackHeight].
   final double? height;
+
+  /// True (default): a card of its own, with a border and a surface colour.
+  /// False: no border or colour, for sitting inside another card (the Home
+  /// green frame); the map is only clipped to [cornerRadius].
+  final bool standalone;
+
+  /// Corner radius of the map.
+  final double cornerRadius;
 
   static const double fallbackHeight = 300;
 
@@ -62,9 +76,11 @@ class _RiskMapPreviewState extends State<RiskMapPreview> {
         height: height,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border, width: 1),
+          color: widget.standalone ? AppColors.surface : null,
+          borderRadius: BorderRadius.circular(widget.cornerRadius),
+          border: widget.standalone
+              ? Border.all(color: AppColors.border, width: 1)
+              : null,
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
