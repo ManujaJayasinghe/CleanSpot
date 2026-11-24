@@ -1,6 +1,9 @@
+import 'package:clean_spot/features/authority/authority_home_screen.dart';
 import 'package:clean_spot/features/map/map_filters.dart';
+import 'package:clean_spot/features/map/map_screen.dart';
 import 'package:clean_spot/models/report_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -66,5 +69,63 @@ void main() {
 
   test('formatReportDate', () {
     expect(formatReportDate(DateTime(2026, 11, 7)), '7 Nov 2026');
+  });
+
+  group('Maps key configuration & missing-key handling', () {
+    test('isValidMapsApiKey rejects empty and placeholder values', () {
+      expect(isValidMapsApiKey(null), isFalse);
+      expect(isValidMapsApiKey(''), isFalse);
+      expect(isValidMapsApiKey('   '), isFalse);
+      expect(isValidMapsApiKey(r'$(MAPS_API_KEY)'), isFalse);
+      expect(isValidMapsApiKey(r'${MAPS_API_KEY}'), isFalse);
+      expect(isValidMapsApiKey('configured-test-key'), isTrue);
+    });
+
+    test('checkMapsApiKeyConfigured returns false when channel is absent', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final configured = await checkMapsApiKeyConfigured(envKey: '');
+      expect(configured, isFalse);
+    });
+
+    testWidgets(
+      'MapScreen shows "Map key not set" and does not crash when key is missing',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MapScreen(
+              validReportsStream: Stream<List<ReportModel>>.value(reports),
+              hasMapsApiKey: false,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Map key not set'), findsOneWidget);
+        expect(find.byKey(const ValueKey('map-key-not-set')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'AuthorityHomeScreen shows "Map key not set" and does not crash when key is missing',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: AuthorityHomeScreen(
+              validReportsStream: Stream<List<ReportModel>>.value(reports),
+              allReportsStream: Stream<List<ReportModel>>.value(reports),
+              photoLoader: (_) async => null,
+              hasMapsApiKey: false,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Map key not set'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('authority-map-key-not-set')),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

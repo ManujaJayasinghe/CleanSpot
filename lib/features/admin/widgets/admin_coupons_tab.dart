@@ -9,10 +9,7 @@ import '../../../services/firestore_service.dart';
 class AdminCouponsTab extends StatelessWidget {
   final FirestoreService firestoreService;
 
-  const AdminCouponsTab({
-    super.key,
-    required this.firestoreService,
-  });
+  const AdminCouponsTab({super.key, required this.firestoreService});
 
   Future<void> _showAddCouponDialog(BuildContext context) async {
     final titleController = TextEditingController();
@@ -27,7 +24,11 @@ class AdminCouponsTab extends StatelessWidget {
     codesController.addListener(() {
       final text = codesController.text.trim();
       if (text.contains(',')) {
-        final list = text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        final list = text
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
         if (list.isNotEmpty) {
           stockController.text = list.length.toString();
         }
@@ -38,7 +39,9 @@ class AdminCouponsTab extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Add New Coupon',
             style: AppTypography.heading.copyWith(fontSize: 18),
@@ -56,8 +59,9 @@ class AdminCouponsTab extends StatelessWidget {
                       labelText: 'Title *',
                       hintText: 'e.g. 15% Eco Grocery Discount',
                     ),
-                    validator: (val) =>
-                        (val == null || val.trim().isEmpty) ? 'Title is required' : null,
+                    validator: (val) => (val == null || val.trim().isEmpty)
+                        ? 'Title is required'
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -79,9 +83,13 @@ class AdminCouponsTab extends StatelessWidget {
                             suffixText: 'pts',
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Cost is required';
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Cost is required';
+                            }
                             final parsed = int.tryParse(val.trim());
-                            if (parsed == null || parsed < 0) return 'Invalid number';
+                            if (parsed == null || parsed < 0) {
+                              return 'Invalid number';
+                            }
                             return null;
                           },
                         ),
@@ -95,7 +103,9 @@ class AdminCouponsTab extends StatelessWidget {
                             labelText: 'Stock *',
                           ),
                           validator: (val) {
-                            if (val == null || val.trim().isEmpty) return 'Stock is required';
+                            if (val == null || val.trim().isEmpty) {
+                              return 'Stock is required';
+                            }
                             final parsed = int.tryParse(val.trim());
                             if (parsed == null || parsed < 0) return 'Invalid';
                             return null;
@@ -111,10 +121,12 @@ class AdminCouponsTab extends StatelessWidget {
                     decoration: const InputDecoration(
                       labelText: 'Promo Code(s) *',
                       hintText: 'e.g. CLEAN2026 or CODE1, CODE2, CODE3',
-                      helperText: 'Separate multiple codes with commas for code pool',
+                      helperText:
+                          'Separate multiple codes with commas for code pool',
                     ),
-                    validator: (val) =>
-                        (val == null || val.trim().isEmpty) ? 'At least one code is required' : null,
+                    validator: (val) => (val == null || val.trim().isEmpty)
+                        ? 'At least one code is required'
+                        : null,
                   ),
                 ],
               ),
@@ -138,8 +150,11 @@ class AdminCouponsTab extends StatelessWidget {
                           .map((s) => s.trim())
                           .where((s) => s.isNotEmpty)
                           .toList();
-                      final stock = int.tryParse(stockController.text.trim()) ?? rawCodes.length;
-                      final cost = int.tryParse(costController.text.trim()) ?? 0;
+                      final stock =
+                          int.tryParse(stockController.text.trim()) ??
+                          rawCodes.length;
+                      final cost =
+                          int.tryParse(costController.text.trim()) ?? 0;
                       final code = rawCodes.isNotEmpty ? rawCodes.first : '';
 
                       try {
@@ -169,13 +184,18 @@ class AdminCouponsTab extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: isSubmitting
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Add Coupon'),
             ),
@@ -194,7 +214,10 @@ class AdminCouponsTab extends StatelessWidget {
     }
   }
 
-  Future<void> _confirmDeleteCoupon(BuildContext context, CouponModel coupon) async {
+  Future<void> _confirmDeleteCoupon(
+    BuildContext context,
+    CouponModel coupon,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -214,7 +237,9 @@ class AdminCouponsTab extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.errorText,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Delete'),
           ),
@@ -267,8 +292,13 @@ class AdminCouponsTab extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ],
@@ -289,7 +319,9 @@ class AdminCouponsTab extends StatelessWidget {
                     padding: const EdgeInsets.all(24),
                     child: Text(
                       'Error loading coupons: ${snapshot.error}',
-                      style: AppTypography.body.copyWith(color: AppColors.errorText),
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.errorText,
+                      ),
                     ),
                   ),
                 );
@@ -326,7 +358,10 @@ class AdminCouponsTab extends StatelessWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 itemCount: coupons.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
@@ -339,7 +374,9 @@ class AdminCouponsTab extends StatelessWidget {
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isOutOfStock ? AppColors.errorBg : AppColors.border,
+                        color: isOutOfStock
+                            ? AppColors.errorBg
+                            : AppColors.border,
                       ),
                     ),
                     child: Row(
@@ -468,7 +505,8 @@ class AdminCouponsTab extends StatelessWidget {
                             Icons.delete_outline,
                             color: AppColors.errorText,
                           ),
-                          onPressed: () => _confirmDeleteCoupon(context, coupon),
+                          onPressed: () =>
+                              _confirmDeleteCoupon(context, coupon),
                         ),
                       ],
                     ),

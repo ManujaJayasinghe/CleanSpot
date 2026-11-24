@@ -10,16 +10,35 @@ import 'risk_map_view.dart';
 
 /// Risk map tab: the live [RiskMapView] with the heatmap/marker toggle, the
 /// time-range chips, and a bottom sheet for a tapped report.
+///
+/// Requires a Google Maps API key configured in `android/local.properties`
+/// (`MAPS_API_KEY`) or `ios/Flutter/Secrets.xcconfig`. When the key is missing,
+/// displays a clear "Map key not set" message instead of crashing.
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({
+    super.key,
+    this.firestoreService,
+    this.validReportsStream,
+    this.hasMapsApiKey,
+    this.mapsKeyChecker,
+  });
+
+  final FirestoreService? firestoreService;
+  final Stream<List<ReportModel>>? validReportsStream;
+  final bool? hasMapsApiKey;
+  final Future<bool> Function()? mapsKeyChecker;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  late final FirestoreService _service;
+  FirestoreService? _lazyService;
+  FirestoreService get _service =>
+      widget.firestoreService ?? (_lazyService ??= FirestoreService());
   late final Stream<List<ReportModel>> _reports;
+
+  bool? _hasMapsKey;
 
   MapViewMode _viewMode = MapViewMode.heatmap;
   MapTimeRange _timeRange = MapTimeRange.last7Days;
@@ -27,8 +46,15 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _service = FirestoreService();
-    _reports = _service.watchValidReports();
+    _reports = widget.validReportsStream ?? _service.watchValidReports();
+    if (widget.hasMapsApiKey != null) {
+      _hasMapsKey = widget.hasMapsApiKey;
+    } else {
+      (widget.mapsKeyChecker ?? checkMapsApiKeyConfigured)().then((hasKey) {
+        if (!mounted) return;
+        setState(() => _hasMapsKey = hasKey);
+      });
+    }
   }
 
   void _showReportSheet(ReportModel report) {
@@ -117,6 +143,22 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildMapArea() {
+    if (_hasMapsKey == false) {
+      return const _MapKeyNotSetBanner();
+    }
+    if (_hasMapsKey == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return RiskMapView(
+      reports: _reports,
+      viewMode: _viewMode,
+      timeRange: _timeRange,
+      onReportTap: _showReportSheet,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -164,13 +206,49 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: RiskMapView(
-                reports: _reports,
-                viewMode: _viewMode,
-                timeRange: _timeRange,
-                onReportTap: _showReportSheet,
-              ),
+            Expanded(child: _buildMapArea()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Displayed when `MAPS_API_KEY` is missing so the map screen fails gracefully.
+class _MapKeyNotSetBanner extends StatelessWidget {
+  const _MapKeyNotSetBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        key: const ValueKey('map-key-not-set'),
+        margin: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.map_outlined,
+              size: 32,
+              color: AppColors.warningText,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              mapKeyNotSetMessage,
+              style: AppTypography.heading.copyWith(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              mapKeyNotSetHint,
+              style: AppTypography.caption,
+              textAlign: TextAlign.center,
             ),
           ],
         ),
