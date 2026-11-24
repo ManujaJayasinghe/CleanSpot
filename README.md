@@ -207,12 +207,13 @@ For full implementation details, data schemas, and backend rules, see:
 
 ## Team
 
-Contributors from the repository commit history (`git shortlog -sn --all`):
+The eight team members, with their GitHub handles where they have commits:
 
 - Manuja Jayasinghe (`ManujaJayasinghe`)
-- IvanShirosh
-- kethmiwarnasooriya
-- Maduranga14
-- Yohan52
-- chathuranga00
-- madushan24
+- Ivan (`IvanShirosh`)
+- Kethmi (`kethmiwarnasooriya`)
+- Maduranga (`Maduranga14`)
+- Yohan (`Yohan52`)
+- Chathuranga (`chathuranga00`)
+- Anushka (`madushan24`)
+- Nonimi (tester, no commits)
