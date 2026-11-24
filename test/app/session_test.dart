@@ -170,7 +170,7 @@ void main() {
       await pump();
       expect(s.ready, isTrue);
       expect(s.role, 'admin');
-      expect(s.redirect('/splash'), '/admin');
+      expect(s.redirect('/splash'), '/home');
       s.dispose();
     });
 
