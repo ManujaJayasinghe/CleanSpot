@@ -12,8 +12,9 @@ const String kBlockedMessage =
     'Your account has been blocked. Contact support.';
 
 /// Where each role lands after login.
+/// Authorities land on their dashboard; admins and regular users land on /home
+/// (admins can access /admin from their profile or drawer).
 String homeRouteFor(String role) => switch (role) {
-      kRoleAdmin => '/admin',
       kRoleAuthority => '/authority',
       _ => '/home',
     };
