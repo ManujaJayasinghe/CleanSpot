@@ -76,8 +76,6 @@ class AuthorityHomeScreen extends StatefulWidget {
     this.onMarkCleared,
     this.photoLoader,
     this.onSignOut,
-    this.hasMapsApiKey,
-    this.mapsKeyChecker,
   });
 
   final FirestoreService? firestoreService;
@@ -86,8 +84,6 @@ class AuthorityHomeScreen extends StatefulWidget {
   final Future<void> Function(String reportId)? onMarkCleared;
   final Future<Uint8List?> Function(String reportId)? photoLoader;
   final Future<void> Function()? onSignOut;
-  final bool? hasMapsApiKey;
-  final Future<bool> Function()? mapsKeyChecker;
 
   @override
   State<AuthorityHomeScreen> createState() => _AuthorityHomeScreenState();
@@ -105,8 +101,6 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
 
   late final Stream<List<ReportModel>> _validReportsStream;
   late final Stream<List<ReportModel>>? _allReportsStream;
-
-  bool? _hasMapsKey;
 
   MapViewMode _viewMode = MapViewMode.heatmap;
   String? _selectedArea;
@@ -137,14 +131,6 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
       _allReportsStream = _service.watchAllReports();
     } else {
       _allReportsStream = null;
-    }
-    if (widget.hasMapsApiKey != null) {
-      _hasMapsKey = widget.hasMapsApiKey;
-    } else {
-      (widget.mapsKeyChecker ?? checkMapsApiKeyConfigured)().then((hasKey) {
-        if (!mounted) return;
-        setState(() => _hasMapsKey = hasKey);
-      });
     }
   }
 
@@ -372,17 +358,17 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
 
   Widget _buildLegend() {
     Widget item(String label, Color color) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 4),
-            Text(label, style: AppTypography.caption.copyWith(fontSize: 11)),
-          ],
-        );
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: AppTypography.caption.copyWith(fontSize: 11)),
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -476,107 +462,68 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
             child: SizedBox(
               height: 230,
               width: double.infinity,
-              child: _hasMapsKey == false
-                  ? Container(
-                      key: const ValueKey('authority-map-key-not-set'),
-                      color: AppColors.background,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.map_outlined,
-                            size: 28,
-                            color: AppColors.warningText,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            mapKeyNotSetMessage,
-                            style: AppTypography.heading.copyWith(fontSize: 15),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            mapKeyNotSetHint,
-                            style: AppTypography.caption,
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    )
-                  : _hasMapsKey == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Stack(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: _buildInteractiveMapCanvas(mappable)),
+                  Positioned(left: 10, bottom: 10, child: _buildLegend()),
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Positioned.fill(
-                          child: _buildInteractiveMapCanvas(mappable),
-                        ),
-                        Positioned(left: 10, bottom: 10, child: _buildLegend()),
-                        Positioned(
-                          right: 10,
-                          bottom: 10,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (mappable.isNotEmpty) ...[
-                                _buildMapControlButton(
-                                  icon: Icons.my_location,
-                                  tooltip: 'Center on latest report',
-                                  onTap: () {
-                                    final sorted = [...mappable]
-                                      ..sort(
-                                        (a, b) =>
-                                            b.createdAt.compareTo(a.createdAt),
-                                      );
-                                    _centerOnReport(sorted.first);
-                                  },
-                                ),
-                                const SizedBox(height: 6),
-                              ],
-                              _buildMapControlButton(
-                                icon: Icons.add,
-                                tooltip: 'Zoom in',
-                                onTap: () => setState(
-                                  () => _zoom = (_zoom + 1).clamp(6.0, 18.0),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              _buildMapControlButton(
-                                icon: Icons.remove,
-                                tooltip: 'Zoom out',
-                                onTap: () => setState(
-                                  () => _zoom = (_zoom - 1).clamp(6.0, 18.0),
-                                ),
-                              ),
-                            ],
+                        if (mappable.isNotEmpty) ...[
+                          _buildMapControlButton(
+                            icon: Icons.my_location,
+                            tooltip: 'Center on latest report',
+                            onTap: () {
+                              final sorted = [...mappable]
+                                ..sort(
+                                  (a, b) => b.createdAt.compareTo(a.createdAt),
+                                );
+                              _centerOnReport(sorted.first);
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        _buildMapControlButton(
+                          icon: Icons.add,
+                          tooltip: 'Zoom in',
+                          onTap: () => setState(
+                            () => _zoom = (_zoom + 1).clamp(6.0, 18.0),
                           ),
                         ),
-                        if (mappable.isEmpty)
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withValues(
-                                  alpha: 0.94,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: const Text(
-                                'All breeding sites cleared — heatmap is cool.',
-                                style: AppTypography.caption,
-                              ),
-                            ),
+                        const SizedBox(height: 6),
+                        _buildMapControlButton(
+                          icon: Icons.remove,
+                          tooltip: 'Zoom out',
+                          onTap: () => setState(
+                            () => _zoom = (_zoom - 1).clamp(6.0, 18.0),
                           ),
+                        ),
                       ],
                     ),
+                  ),
+                  if (mappable.isEmpty)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.94),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Text(
+                          'All breeding sites cleared — heatmap is cool.',
+                          style: AppTypography.caption,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -843,10 +790,7 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
                 color: AppColors.primaryDark,
               ),
               const SizedBox(width: 6),
-              Text(
-                area,
-                style: AppTypography.heading.copyWith(fontSize: 16),
-              ),
+              Text(area, style: AppTypography.heading.copyWith(fontSize: 16)),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -992,8 +936,7 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
                           child: _EmptyReportsCard(
                             icon: Icons.cloud_off_outlined,
                             title: 'Could not load valid reports',
-                            subtitle:
-                                'Check your connection or Firestore permissions.',
+                            subtitle: 'Check your connection or Firestore permissions.',
                           ),
                         )
                       else if (activeValid.isEmpty)
@@ -1002,8 +945,7 @@ class _AuthorityHomeScreenState extends State<AuthorityHomeScreen> {
                           child: _EmptyReportsCard(
                             icon: Icons.verified_outlined,
                             title: 'No valid reports pending clearance',
-                            subtitle:
-                                'All reported mosquito breeding sites have been cleared.',
+                            subtitle: 'All reported mosquito breeding sites have been cleared.',
                           ),
                         )
                       else
@@ -1385,10 +1327,7 @@ class _AuthorityReportDetailSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              'AI reason: $aiReason',
-              style: AppTypography.body,
-            ),
+            Text('AI reason: $aiReason', style: AppTypography.body),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

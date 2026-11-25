@@ -9,7 +9,7 @@
 
 ### 1.1 Flutter Tests
 
-The following commands were executed on 25 November 2026 with Flutter 3.47.0, on the latest `main` (including the merged Home screen, report location map, app logo and Maps key changes) plus the stock photo removal:
+The following commands were executed on 25 November 2026 with Flutter 3.47.0, on the latest `main` plus the removal of the Maps API key check:
 
 ```bash
 flutter analyze
@@ -27,12 +27,12 @@ flutter test
 | Metric | Result |
 |---|---:|
 | Total test files | 26 |
-| Total tests | 273 |
-| Passed tests | 273 |
+| Total tests | 271 |
+| Passed tests | 271 |
 | Failed tests | 0 |
 | Skipped tests | 0 |
 
-**Result:** All 273 tests passed, with no failures and none skipped.
+**Result:** All 271 tests passed, with no failures and none skipped.
 
 The earlier failure in `test/app/session_test.dart` (`SessionNotifier signing in is not ready until the profile arrives`) was fixed when the Home screen changes were merged; the test now expects the `/home` landing route and passes.
 

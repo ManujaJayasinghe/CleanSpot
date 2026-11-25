@@ -37,7 +37,7 @@ Roles are stored in `users/{uid}.role` in Cloud Firestore (`lib/models/user_mode
   - `firebase_app_check` (`^0.5.1`) using the debug provider in debug builds and Play Integrity / App Attest in release builds
   - `firebase_ai` (`^5.1.0`) for Firebase AI Logic, calling Gemini model `gemini-3.5-flash-lite` (`kAiModelName` in `lib/features/ai_validation/ai_config.dart`) via `FirebaseAI.googleAI()`
 - **Device sensors, media, and charts**: `image_picker` (`^1.2.4`), `geolocator` (`^14.1.2`), `image` (`^4.3.0`), `fl_chart` (`^1.3.1`), and `cupertino_icons` (`^2.0.0`).
-- **Maps**: OpenStreetMap street tiles (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) projected with a custom Web Mercator implementation (`lib/features/map/map_projection.dart`) and rendered in `RiskMapView`, `LocationPreviewMap`, and `AuthorityHomeScreen`. The `google_maps_flutter` (`^2.19.0`) package is included for coordinate/heatmap data types (`LatLng`, `WeightedLatLng` in `lib/features/map/map_filters.dart`) and native platform key configuration.
+- **Maps**: OpenStreetMap street tiles (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) projected with a custom Web Mercator implementation (`lib/features/map/map_projection.dart`) and rendered in `RiskMapView`, `LocationPreviewMap`, and `AuthorityHomeScreen`. No Maps API key or Google Maps package is needed.
 - **Firebase Spark plan design**: The backend runs on the free Firebase Spark plan, which does not include Cloud Functions or free Cloud Storage buckets (note: `firebase_storage: ^14.0.1` is listed in `pubspec.yaml`, but the app does not use Cloud Storage). Instead, approved report photos are resized in `lib/features/report/report_screen.dart` to at most 800 px, encoded as JPEG at quality 70 (and stepped down if needed to stay under 300 KB), and stored as Base64 in `reportPhotos/{reportId}` separate from `reports/{reportId}` so list, map, and geohash queries never transfer image bytes.
 
 ## Project structure
@@ -119,21 +119,6 @@ Firebase AI Logic requires a valid App Check attestation. Debug builds use `Andr
 3. Open **Firebase console > App Check > Apps > clean_spot (android) > Manage debug tokens > Add debug token** and paste only the UUID value.
 4. Wait one to two minutes, then restart the app. The debug token changes if you uninstall the app or clear app storage.
 
-### Maps key configuration
-
-`MapScreen` (`lib/features/map/map_screen.dart`) and `AuthorityHomeScreen` (`lib/features/authority/authority_home_screen.dart`) check whether `MAPS_API_KEY` is configured via `checkMapsApiKeyConfigured()` (`lib/features/map/map_filters.dart`). If no key is set, both screens show a **Map key not set** message instead of crashing, while the Home preview (`RiskMapPreview`) and Report form preview (`LocationPreviewMap`) render OpenStreetMap tiles directly.
-
-To enable the map on `MapScreen` and `AuthorityHomeScreen`, set `MAPS_API_KEY` in one of these git-ignored files (or pass `--dart-define=MAPS_API_KEY=<your-key>` at run time):
-
-- **Android** (`android/local.properties`, read by `android/app/build.gradle.kts` and exposed by `MainActivity.kt`):
-  ```properties
-  MAPS_API_KEY=your_maps_api_key_here
-  ```
-- **iOS** (`ios/Flutter/Secrets.xcconfig`, read via `Info.plist` by `ios/Runner/AppDelegate.swift`):
-  ```xcconfig
-  MAPS_API_KEY=your_maps_api_key_here
-  ```
-
 ### Running the app and `--dart-define` flags
 
 Run a standard build on your device or emulator:
@@ -142,14 +127,13 @@ Run a standard build on your device or emulator:
 flutter run -d <deviceId>
 ```
 
-The codebase supports four `--dart-define` flags:
+The codebase supports three `--dart-define` flags:
 
 | Flag | Defined in | What it does |
 |---|---|---|
 | `DEMO_CONTROLS=true` | `lib/features/report/report_screen.dart` | Shows the "UI FLOW" stage switcher bar and the Simulate Approved / Simulate Rejected buttons on the Report screen for classroom demonstrations. Off by default. |
 | `AI_LIVE_TEST=true` | `lib/main.dart`, `lib/features/ai_validation/dev_live_test.dart` | Debug builds only (`kDebugMode`). At startup, runs `AiValidationService.validatePhoto()` on every `.jpg` or `.jpeg` in `assets/dev_samples/` and logs each `ValidationResult` with prefix `AI LIVE TEST`. |
 | `DEBUG_CAPTURE_ASSET=assets/dev_samples/<file>.jpg` | `lib/features/ai_validation/capture_service.dart` | Debug builds only (`kDebugMode`). Skips opening the camera when tapping Camera on the Report screen and loads the specified bundled JPEG asset instead, while still running real location permission and GPS accuracy checks (useful on an emulator where the virtual camera scene is rejected as fake). |
-| `MAPS_API_KEY=<key>` | `lib/features/map/map_filters.dart` | Satisfies `checkMapsApiKeyConfigured()` from the command line without editing `android/local.properties` or `ios/Flutter/Secrets.xcconfig`. |
 
 Example running with the debug capture asset on an emulator:
 
